@@ -517,37 +517,29 @@ button {
   padding: 55px 20px 0 52px;
 }
 
-.brand {
+
+
+.logo {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  margin: auto;
   display: flex;
-  align-items: center;
-  gap: 9px;
+  justify-content: center;
+  margin-top: 50px;
+  width: 50%;
+}
+.logo img{
+
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  width: 400px;
+  height: 150px;
+  
 }
 
 
-
-.brand-mark span {
-  font-size: 17px;
-}
-
-.brand-mark small {
-  margin-top: 3px;
-  font-size: 9px;
-  font-weight: 800;
-}
-
-.brand-name {
-  font-size: 31px;
-  line-height: 1;
-  font-weight: 900;
-  font-style: italic;
-  color: #050505;
-}
-
-.brand-subtitle {
-  margin-top: 4px;
-  font-size: 11px;
-  color: #333;
-}
 
 .presentation h1 {
   margin: 22px 0 4px;

@@ -327,8 +327,8 @@ const Icon = ({ type }) => {
 
 function Logo() {
   return (
-    <div className="brand">
-      <div className="logo-img">
+    <div className="logo">
+      <div className="Logo">
         <img src="/images/fabicon,fondo.jpeg" alt=""/>
       </div>
     </div>
