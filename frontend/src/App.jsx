@@ -1,5 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "./App.css";
+
+const API_URL = "/api";
+
+function getStoredUser() {
+  try {
+    const user = localStorage.getItem("sac_user");
+    return user ? JSON.parse(user) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function apiFetch(endpoint, options = {}) {
+  const token = localStorage.getItem("sac_token");
+
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    },
+    ...options
+  });
+
+  const contentType = response.headers.get("content-type") || "";
+  const data = contentType.includes("application/json") ? await response.json() : await response.text();
+
+  if (!response.ok) {
+    const message = typeof data === "string" ? data : data?.mensaje || "Error de conexión";
+    throw new Error(message);
+  }
+
+  return data;
+}
 /*
 function Logo() {
   return (
@@ -344,16 +378,28 @@ function CityIllustration() {
   );
 }
 
-function Field({ icon, type = "text", placeholder }) {
+function Field({ icon, type = "text", placeholder, name, value, onChange, autoComplete }) {
   return (
     <div className="field">
       <span className="field-icon"><Icon type={icon} /></span>
-      <input type={type} placeholder={placeholder} />
+      <input
+        type={type}
+        name={name}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        autoComplete={autoComplete}
+      />
     </div>
   );
 }
 
-function Login({ goRegister, goHome }) {
+function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorMessage }) {
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setLoginForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   return (
     <div className="page">
       <div className="decoration top-left" />
@@ -381,9 +427,29 @@ function Login({ goRegister, goHome }) {
           <h2>Iniciar sesión</h2>
           <p className="card-description">Ingresá a tu cuenta para continuar</p>
 
-          <form onSubmit={(e) => { e.preventDefault(); goHome(); }}>
-            <Field icon="mail" placeholder="Correo electrónico o usuario" />
-            <Field icon="lock" type="password" placeholder="Contraseña" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              goHome();
+            }}
+          >
+            <Field
+              icon="mail"
+              name="email"
+              placeholder="Correo electrónico"
+              value={loginForm.email}
+              onChange={handleChange}
+              autoComplete="email"
+            />
+            <Field
+              icon="lock"
+              type="password"
+              name="password"
+              placeholder="Contraseña"
+              value={loginForm.password}
+              onChange={handleChange}
+              autoComplete="current-password"
+            />
 
             <div className="form-options">
               <label className="remember">
@@ -393,7 +459,11 @@ function Login({ goRegister, goHome }) {
               <button type="button" className="text-button">¿Olvidaste tu contraseña?</button>
             </div>
 
-            <button className="primary-button" type="submit">Iniciar sesión</button>
+            {errorMessage && <p className="error-message">{errorMessage}</p>}
+
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? "Ingresando..." : "Iniciar sesión"}
+            </button>
           </form>
 
           <div className="divider"><span>o</span></div>
@@ -409,7 +479,12 @@ function Login({ goRegister, goHome }) {
   );
 }
 
-function Register({ goLogin }) {
+function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMessage, successMessage, onSubmit }) {
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setRegisterForm((prev) => ({ ...prev, [name]: value }));
+  };
+
   return (
     <div className="page">
       <div className="decoration top-left" />
@@ -432,16 +507,22 @@ function Register({ goLogin }) {
           <h2>Crear cuenta</h2>
           <p className="card-description">Completá tus datos para unirte a la comunidad</p>
 
-          <form onSubmit={(e) => { e.preventDefault(); goLogin(); }}>
-            <Field icon="user" placeholder="DNI" />
-            <Field icon="user" placeholder="Nombre" />
-            <Field icon="user" placeholder="Apellido" />
-            <Field icon="mail" placeholder="Correo electrónico" />
-            <Field icon="user" placeholder="Usuario" />
-            <Field icon="lock" type="password" placeholder="Contraseña" />
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              onSubmit();
+            }}
+          >
+            <Field icon="user" name="nombre" placeholder="Nombre" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" />
+            <Field icon="user" name="apellido" placeholder="Apellido" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" />
+            <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" />
+            <Field icon="lock" name="contrasena" type="password" placeholder="Contraseña" value={registerForm.contrasena} onChange={handleChange} autoComplete="new-password" />
 
-            <button className="primary-button register-button" type="submit">
-              Registrarme
+            {errorMessage && <p className="error-message">{errorMessage}</p>}
+            {successMessage && <p className="success-message">{successMessage}</p>}
+
+            <button className="primary-button register-button" type="submit" disabled={submitting}>
+              {submitting ? "Registrando..." : "Registrarme"}
             </button>
           </form>
 
@@ -460,7 +541,11 @@ function Register({ goLogin }) {
    NUEVAS PANTALLAS (S.A.C. 3, 4 y 5)
    ========================================================================== */
 
-function AppLayout({ activeNav, navigateTo, children, screenNumber }) {
+function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogout }) {
+  const nombreUsuario = user?.nombre
+    ? `${user.nombre} ${user.apellido || ""}`.trim()
+    : "Usuario";
+
   return (
     <div className="sac-app-container">
       {/* Top Navbar */}
@@ -474,8 +559,13 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber }) {
         </div>
         <div className="sac-user-profile">
           <span className="sac-user-avatar">👤</span>
-          <span className="sac-user-name">Aisha Gomez</span>
+          <span className="sac-user-name">{nombreUsuario}</span>
           <span className="sac-user-arrow">⌄</span>
+          {onLogout && (
+            <button className="sac-logout-btn" onClick={onLogout} type="button">
+              Salir
+            </button>
+          )}
         </div>
       </header>
 
@@ -497,15 +587,15 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber }) {
               <span className="sac-nav-icon">📄</span>
               <span>Reportes</span>
             </button>
-            <button className="sac-nav-item">
+            <button className="sac-nav-item" onClick={() => navigateTo("mapa")}>
               <span className="sac-nav-icon">🗺️</span>
               <span>Mapa</span>
             </button>
-            <button className="sac-nav-item">
+            <button className="sac-nav-item" onClick={() => navigateTo("notificaciones")}>
               <span className="sac-nav-icon">🔔</span>
               <span>Notificaciones</span>
             </button>
-            <button className="sac-nav-item">
+            <button className="sac-nav-item" onClick={() => navigateTo("perfil")}>
               <span className="sac-nav-icon">👤</span>
               <span>Perfil</span>
             </button>
@@ -524,12 +614,14 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber }) {
 }
 
 /* Pantalla 3: Dashboard Principal */
-function Dashboard({ navigateTo }) {
+function Dashboard({ navigateTo, user, onLogout }) {
+  const nombre = user?.nombre || "Usuario";
+
   return (
-    <AppLayout activeNav="home" navigateTo={navigateTo} screenNumber="3">
+    <AppLayout activeNav="home" navigateTo={navigateTo} screenNumber="3" user={user} onLogout={onLogout}>
       <div className="sac-dashboard-header">
         <div>
-          <h1 className="sac-welcome-title">¡Bienvenido/a, Aisha!</h1>
+          <h1 className="sac-welcome-title">¡Bienvenido/a, {nombre}!</h1>
           <p className="sac-welcome-subtitle">Juntos hacemos un vecindario mejor</p>
         </div>
 
@@ -579,9 +671,9 @@ function Dashboard({ navigateTo }) {
 }
 
 /* Pantalla 4: Formulario de Reporte */
-function ReportForm({ navigateTo }) {
+function ReportForm({ navigateTo, onLogout }) {
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4">
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" onLogout={onLogout}>
       <h1 className="sac-page-title">Reportar un problema</h1>
       <p className="sac-page-subtitle">Completá la información para enviar tu reporte</p>
 
@@ -655,83 +747,66 @@ function ReportForm({ navigateTo }) {
 }
 
 /* Pantalla 5: Lista de Mis Reportes */
-function MyReports({ navigateTo }) {
+function MyReports({ navigateTo, onLogout }) {
   const [filter, setFilter] = useState("todos");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const reports = [
-    {
-      id: 1,
-      title: "Bache en la calle",
-      location: "Calle 12 y 5",
-      date: "08/09/2026",
-      status: "En proceso",
-      statusClass: "status-in-process",
-    },
-    {
-      id: 2,
-      title: "Basura en la vereda",
-      location: "Calle 12 y 5",
-      date: "08/09/2026",
-      status: "Pendiente",
-      statusClass: "status-pending",
-    },
-    {
-      id: 3,
-      title: "Falta de alumbrado",
-      location: "Calle 12 y 5",
-      date: "08/09/2026",
-      status: "Resuelto",
-      statusClass: "status-resolved",
-    },
-  ];
+  useEffect(() => {
+    async function cargarReportes() {
+      try {
+        const data = await apiFetch("/reportes/mis-reportes");
+        setReports(data.reportes || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    cargarReportes();
+  }, []);
+
+  const filteredReports = reports.filter((reporte) => {
+    if (filter === "todos") return true;
+    const estado = (reporte.estado || "").toLowerCase();
+    if (filter === "pendientes") return estado === "pendiente";
+    if (filter === "en-proceso") return estado === "en proceso";
+    if (filter === "resueltos") return estado === "resuelto";
+    return true;
+  });
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5">
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" onLogout={onLogout}>
       <h1 className="sac-page-title">Mis reportes</h1>
       <p className="sac-page-subtitle">Acá podés ver el estado de todos tus reportes</p>
 
-      {/* Tabs de Filtro */}
       <div className="sac-filter-tabs">
-        <button
-          className={`sac-tab ${filter === "todos" ? "active" : ""}`}
-          onClick={() => setFilter("todos")}
-        >
-          Todos
-        </button>
-        <button
-          className={`sac-tab ${filter === "pendientes" ? "active" : ""}`}
-          onClick={() => setFilter("pendientes")}
-        >
-          Pendientes
-        </button>
-        <button
-          className={`sac-tab ${filter === "en-proceso" ? "active" : ""}`}
-          onClick={() => setFilter("en-proceso")}
-        >
-          En proceso
-        </button>
-        <button
-          className={`sac-tab ${filter === "resueltos" ? "active" : ""}`}
-          onClick={() => setFilter("resueltos")}
-        >
-          Resueltos
-        </button>
+        <button className={`sac-tab ${filter === "todos" ? "active" : ""}`} onClick={() => setFilter("todos")}>Todos</button>
+        <button className={`sac-tab ${filter === "pendientes" ? "active" : ""}`} onClick={() => setFilter("pendientes")}>Pendientes</button>
+        <button className={`sac-tab ${filter === "en-proceso" ? "active" : ""}`} onClick={() => setFilter("en-proceso")}>En proceso</button>
+        <button className={`sac-tab ${filter === "resueltos" ? "active" : ""}`} onClick={() => setFilter("resueltos")}>Resueltos</button>
       </div>
 
-      {/* Lista de Tarjetas */}
       <div className="sac-reports-list">
-        {reports.map((item) => (
-          <div className="sac-report-card" key={item.id}>
-            <div className="sac-report-thumb">FOTO</div>
-            <div className="sac-report-info">
-              <h3>{item.title}</h3>
-              <p>{item.location} • {item.date}</p>
+        {loading ? (
+          <p>Cargando reportes...</p>
+        ) : filteredReports.length === 0 ? (
+          <p>No tenés reportes en esta categoría.</p>
+        ) : (
+          filteredReports.map((item) => (
+            <div className="sac-report-card" key={item.id_reporte}>
+              <div className="sac-report-thumb">{item.foto ? "IMG" : "FOTO"}</div>
+              <div className="sac-report-info">
+                <h3>{item.titulo}</h3>
+                <p>{item.direccion} • {new Date(item.fecha_reporte).toLocaleDateString("es-AR")}</p>
+              </div>
+              <div className={`sac-status-badge ${(item.estado || "pendiente").toLowerCase().replace(/\s+/g, "-")}`}>
+                {item.estado || "Pendiente"}
+              </div>
             </div>
-            <div className={`sac-status-badge ${item.statusClass}`}>
-              {item.status}
-            </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </AppLayout>
   );
@@ -739,35 +814,171 @@ function MyReports({ navigateTo }) {
 
 /* Componente Principal Manejador de Vistas */
 export default function App() {
-  const [screen, setScreen] = useState("login");
+  const [screen, setScreen] = useState(() => {
+    const storedToken = localStorage.getItem("sac_token");
+    return storedToken ? "home" : "login";
+  });
+  const [user, setUser] = useState(() => getStoredUser());
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [registerForm, setRegisterForm] = useState({ nombre: "", apellido: "", email: "", contrasena: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const handleLogin = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const data = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: loginForm.email,
+          contrasena: loginForm.password
+        })
+      });
+
+      localStorage.setItem("sac_token", data.token);
+      localStorage.setItem("sac_user", JSON.stringify(data.usuario));
+      setUser(data.usuario);
+      setScreen("home");
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const data = await apiFetch("/auth/registro", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: registerForm.nombre,
+          apellido: registerForm.apellido,
+          email: registerForm.email,
+          contrasena: registerForm.contrasena
+        })
+      });
+
+      setSuccessMessage(data.mensaje || "Usuario registrado correctamente");
+      setRegisterForm({ nombre: "", apellido: "", email: "", contrasena: "" });
+      setTimeout(() => {
+        setScreen("login");
+      }, 800);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("sac_token");
+    localStorage.removeItem("sac_user");
+    setUser(null);
+    setScreen("login");
+    setLoginForm({ email: "", password: "" });
+  };
+
+  useEffect(() => {
+    if (!localStorage.getItem("sac_token")) return;
+
+    async function cargarDatosUsuario() {
+      try {
+        const data = await apiFetch("/auth/usuario");
+        setUser(data.usuario);
+        localStorage.setItem("sac_user", JSON.stringify(data.usuario));
+      } catch (error) {
+        console.error(error);
+        handleLogout();
+      }
+    }
+
+    cargarDatosUsuario();
+  }, []);
 
   if (screen === "login") {
-    return <Login goRegister={() => setScreen("register")} goHome={() => setScreen("home")} />;
-  }
-  if (screen === "register") {
-    return <Register goLogin={() => setScreen("login")} />;
-  }
-  if (screen === "home") {
-    return <Dashboard navigateTo={setScreen} />;
-  }
-  if (screen === "reportar-form") {
-    return <ReportForm navigateTo={setScreen} />;
-  }
-  if (screen === "mis-reportes") {
-    return <MyReports navigateTo={setScreen} />;
+    return (
+      <Login
+        goRegister={() => {
+          setErrorMessage("");
+          setSuccessMessage("");
+          setScreen("register");
+        }}
+        goHome={handleLogin}
+        loginForm={loginForm}
+        setLoginForm={setLoginForm}
+        submitting={submitting}
+        errorMessage={errorMessage}
+      />
+    );
   }
 
-  return <Login goRegister={() => setScreen("register")} goHome={() => setScreen("home")} />;
+  if (screen === "register") {
+    return (
+      <Register
+        goLogin={() => {
+          setErrorMessage("");
+          setSuccessMessage("");
+          setScreen("login");
+        }}
+        registerForm={registerForm}
+        setRegisterForm={setRegisterForm}
+        submitting={submitting}
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        onSubmit={handleRegister}
+      />
+    );
+  }
+
+  if (screen === "home") {
+    return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
+  if (screen === "reportar-form") {
+    return <ReportForm navigateTo={setScreen} onLogout={handleLogout} />;
+  }
+  if (screen === "mis-reportes") {
+    return <MyReports navigateTo={setScreen} onLogout={handleLogout} />;
+  }
+  if (screen === "mapa") {
+    return <MapScreen navigateTo={setScreen} onLogout={handleLogout} />;
+  }
+  if (screen === "perfil") {
+    return <ProfileScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
+  if (screen === "notificaciones") {
+    return <NotificationsScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
+
+  return (
+    <Login
+      goRegister={() => {
+        setErrorMessage("");
+        setSuccessMessage("");
+        setScreen("register");
+      }}
+      goHome={handleLogin}
+      loginForm={loginForm}
+      setLoginForm={setLoginForm}
+      submitting={submitting}
+      errorMessage={errorMessage}
+    />
+  );
 }
 
 /* Pantalla: Mapa (S.A.C. - Pantalla 6) */
-function MapScreen({ navigateTo }) {
+function MapScreen({ navigateTo, onLogout }) {
   return (
-    <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6">
+    <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
       <p className="sac-page-subtitle">Explorá los reportes de tu zona</p>
 
-      {/* Leyenda de Estados */}
       <div className="sac-map-legend">
         <div className="sac-legend-item">
           <span className="legend-dot red"></span>
@@ -783,29 +994,20 @@ function MapScreen({ navigateTo }) {
         </div>
       </div>
 
-      {/* Vista del Mapa con Pines */}
       <div className="sac-map-canvas">
         <div className="sac-map-grid-overlay" />
         <div className="sac-map-river" />
-
-        {/* Marcadores / Pines */}
         <div className="sac-map-pin red" style={{ top: '25%', left: '44%' }}>📍</div>
         <div className="sac-map-pin red" style={{ top: '50%', left: '54%' }}>📍</div>
         <div className="sac-map-pin red" style={{ top: '68%', left: '43%' }}>📍</div>
-
         <div className="sac-map-pin yellow" style={{ top: '51%', left: '38%' }}>📍</div>
         <div className="sac-map-pin yellow" style={{ top: '63%', left: '63%' }}>📍</div>
         <div className="sac-map-pin yellow" style={{ top: '68%', left: '26%' }}>📍</div>
-
         <div className="sac-map-pin green" style={{ top: '46%', left: '23%' }}>📍</div>
         <div className="sac-map-pin green" style={{ top: '41%', left: '68%' }}>📍</div>
       </div>
 
-      {/* Tarjeta Flotante Inferior de Vista Previa */}
-      <div 
-        className="sac-map-preview-card"
-        onClick={() => navigateTo("detalle-reporte")}
-      >
+      <div className="sac-map-preview-card" onClick={() => navigateTo("detalle-reporte")}>
         <div className="sac-report-thumb">FOTO</div>
         <div className="sac-report-info">
           <h3>Bache en la calle</h3>
@@ -813,6 +1015,96 @@ function MapScreen({ navigateTo }) {
           <span className="sac-status-badge status-in-process small-badge">En proceso</span>
         </div>
         <div className="sac-map-preview-arrow">▶</div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function ProfileScreen({ navigateTo, user, onLogout }) {
+  return (
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="7" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Perfil</h1>
+      <p className="sac-page-subtitle">Tus datos de cuenta</p>
+
+      <div className="sac-form-container">
+        <div className="sac-form-group">
+          <label className="sac-label">Nombre</label>
+          <div className="sac-textarea-wrapper">
+            <p>{user?.nombre || "-"}</p>
+          </div>
+        </div>
+        <div className="sac-form-group">
+          <label className="sac-label">Apellido</label>
+          <div className="sac-textarea-wrapper">
+            <p>{user?.apellido || "-"}</p>
+          </div>
+        </div>
+        <div className="sac-form-group">
+          <label className="sac-label">Correo electrónico</label>
+          <div className="sac-textarea-wrapper">
+            <p>{user?.email || "-"}</p>
+          </div>
+        </div>
+        <div className="sac-form-group">
+          <label className="sac-label">Rol</label>
+          <div className="sac-textarea-wrapper">
+            <p>{user?.rol || "vecino"}</p>
+          </div>
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
+function NotificationsScreen({ navigateTo, user, onLogout }) {
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    async function cargar() {
+      try {
+        const data = await apiFetch("/notificaciones");
+        setItems(data.notificaciones || []);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+
+    cargar();
+  }, []);
+
+  const marcarLeidas = async () => {
+    try {
+      await apiFetch("/notificaciones/leer", { method: "PUT" });
+      const data = await apiFetch("/notificaciones");
+      setItems(data.notificaciones || []);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  return (
+    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Notificaciones</h1>
+      <p className="sac-page-subtitle">Novedades sobre tus reportes</p>
+
+      <button className="sac-primary-btn" type="button" onClick={marcarLeidas}>
+        Marcar como leídas
+      </button>
+
+      <div className="sac-reports-list">
+        {items.length === 0 ? (
+          <p>No tenés notificaciones.</p>
+        ) : (
+          items.map((item) => (
+            <div className="sac-report-card" key={item.id_notificacion}>
+              <div className="sac-report-thumb">🔔</div>
+              <div className="sac-report-info">
+                <h3>{item.tipo || "Nuevo aviso"}</h3>
+                <p>{item.mensaje}</p>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </AppLayout>
   );
@@ -888,65 +1180,3 @@ function ReportDetail({ navigateTo }) {
   );
 }
 
-/* Pantalla: Notificaciones (S.A.C. - Pantalla 8) */
-function NotificationsScreen({ navigateTo }) {
-  const notifications = [
-    {
-      id: 1,
-      icon: "📋",
-      iconBg: "#f97316",
-      title: "Tu reporte fue revisado",
-      desc: "El administrador revisó tu reporte #152.",
-      time: "Hace 2 horas"
-    },
-    {
-      id: 2,
-      icon: "📍",
-      iconBg: "#f97316",
-      title: "El municipio comenzó a trabajar",
-      desc: "El área de Obras Públicas asignó tu reporte #152.",
-      time: "Hace 5 horas"
-    },
-    {
-      id: 3,
-      icon: "✔",
-      iconBg: "#f97316",
-      title: "Tu reporte fue resuelto",
-      desc: "El reporte Bache en Av. 2 fue marcado como resuelto.",
-      time: "Hace 2 días"
-    },
-    {
-      id: 4,
-      icon: "👍",
-      iconBg: "#ea580c",
-      title: "Tu reporte fue apoyado",
-      desc: "3 vecinos más apoyaron tu reporte #138.",
-      time: "Hace 3 días"
-    }
-  ];
-
-  return (
-    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8">
-      <h1 className="sac-page-title">Notificaciones</h1>
-      <p className="sac-page-subtitle">Enterate de todas las novedades</p>
-
-      <div className="sac-notifications-list">
-        {notifications.map((item) => (
-          <div className="sac-notification-card" key={item.id}>
-            <div 
-              className="sac-notification-icon-wrapper"
-              style={{ backgroundColor: item.iconBg }}
-            >
-              <span>{item.icon}</span>
-            </div>
-            <div className="sac-notification-content">
-              <h3>{item.title}</h3>
-              <p>{item.desc}</p>
-            </div>
-            <div className="sac-notification-time">{item.time}</div>
-          </div>
-        ))}
-      </div>
-    </AppLayout>
-  );
-}
