@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = Number(process.env.PORT) || 3002;
 
 app.use(cors());
 app.use(express.json());
@@ -34,6 +34,20 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor backend corriendo en http://localhost:${PORT}`);
-});
+function iniciarServidor(port) {
+  const server = app.listen(port, () => {
+    console.log(`Servidor backend corriendo en http://localhost:${port}`);
+  });
+
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE" && port === DEFAULT_PORT) {
+      console.warn(`Puerto ${port} ocupado. Reintentando en ${port + 1}...`);
+      iniciarServidor(port + 1);
+      return;
+    }
+
+    throw error;
+  });
+}
+
+iniciarServidor(DEFAULT_PORT);

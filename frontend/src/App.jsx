@@ -574,6 +574,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
         <aside className="sac-sidebar">
           <nav className="sac-nav-menu">
             <button
+              type="button"
               className={`sac-nav-item ${activeNav === "home" ? "active" : ""}`}
               onClick={() => navigateTo("home")}
             >
@@ -581,21 +582,22 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               <span>Inicio</span>
             </button>
             <button
+              type="button"
               className={`sac-nav-item ${activeNav === "reportes" ? "active" : ""}`}
               onClick={() => navigateTo("mis-reportes")}
             >
               <span className="sac-nav-icon">📄</span>
               <span>Reportes</span>
             </button>
-            <button className="sac-nav-item" onClick={() => navigateTo("mapa")}>
+            <button type="button" className="sac-nav-item" onClick={() => navigateTo("mapa")}>
               <span className="sac-nav-icon">🗺️</span>
               <span>Mapa</span>
             </button>
-            <button className="sac-nav-item" onClick={() => navigateTo("notificaciones")}>
+            <button type="button" className="sac-nav-item" onClick={() => navigateTo("notificaciones")}>
               <span className="sac-nav-icon">🔔</span>
               <span>Notificaciones</span>
             </button>
-            <button className="sac-nav-item" onClick={() => navigateTo("perfil")}>
+            <button type="button" className="sac-nav-item" onClick={() => navigateTo("perfil")}>
               <span className="sac-nav-icon">👤</span>
               <span>Perfil</span>
             </button>
@@ -948,6 +950,9 @@ export default function App() {
   }
   if (screen === "mapa") {
     return <MapScreen navigateTo={setScreen} onLogout={handleLogout} />;
+  }
+  if (screen === "detalle-reporte") {
+    return <ReportDetail navigateTo={setScreen} />;
   }
   if (screen === "perfil") {
     return <ProfileScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
