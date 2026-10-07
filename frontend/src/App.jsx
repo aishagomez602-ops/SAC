@@ -513,6 +513,7 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
               onSubmit();
             }}
           >
+            <Field icon="lock" name="DNI " type="DNI" placeholder="DNI" value={registerForm.DNI} onChange={handleChange} autoComplete="DNI" />
             <Field icon="user" name="nombre" placeholder="Nombre" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" />
             <Field icon="user" name="apellido" placeholder="Apellido" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" />
             <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" />
