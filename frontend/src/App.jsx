@@ -338,7 +338,7 @@ const Icon = ({ type }) => {
   if (type === "mail") {
     return (
       <svg {...common}>
-        <rect x="3" y="5" wid  th="18" height="14" rx="1.5" />
+        <rect x="3" y="5" width="18" height="14" rx="1.5" />
         <path d="m3 6 9 7 9-7" />
       </svg>
     );
