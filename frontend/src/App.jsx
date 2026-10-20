@@ -35,10 +35,10 @@ async function apiFetch(endpoint, options = {}) {
   return data;
 } 
 
-const Icon = ({ type }) => {
+const Icon = ({ type, size = 22 }) => {
   const common = {
-    width: 22,
-    height: 22,
+    width: size,
+    height: size,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
@@ -47,30 +47,50 @@ const Icon = ({ type }) => {
     strokeLinejoin: "round",
   };
 
-  
-
-  if (type === "mail") {
-    return (
-      <svg {...common}>
+  const icons = {
+    mail: (
+      <>
         <rect x="3" y="5" width="18" height="14" rx="1.5" />
         <path d="m3 6 9 7 9-7" />
-      </svg>
-    );
-  }
-
-  if (type === "lock") {
-    return (
-      <svg {...common}>
+      </>
+    ),
+    lock: (
+      <>
         <rect x="5" y="10" width="14" height="10" rx="1.5" />
         <path d="M8 10V7a4 4 0 0 1 8 0v3" />
-      </svg>
-    );
-  }
+      </>
+    ),
+    user: (
+      <>
+        <circle cx="12" cy="8" r="3.2" />
+        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+      </>
+    ),
+    home: <path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
+    file: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v5h5M9 13h6M9 17h6" /></>,
+    map: <><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3z" /><path d="M9 3v15M15 6v15" /></>,
+    bell: <><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" /><path d="M10 21h4" /></>,
+    megaphone: <><path d="m3 11 14-5v12L3 13z" /><path d="M17 10h3a2 2 0 0 1 0 4h-3M6 14l2 6h4l-2-7" /></>,
+    clipboard: <><rect x="5" y="5" width="14" height="16" rx="2" /><path d="M9 5.5V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1.5M9 11h6M9 15h6" /></>,
+    pin: <><path d="M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z" /><circle cx="12" cy="10" r="2.5" /></>,
+    book: <><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v17H6.5A2.5 2.5 0 0 1 4 17.5z" /><path d="M4 17.5A2.5 2.5 0 0 1 6.5 15H20M8 7h7" /></>,
+    camera: <><path d="M4 7h3l1.5-2h7L17 7h3v12H4z" /><circle cx="12" cy="13" r="3.5" /></>,
+    road: <><path d="M8 3 5 21M16 3l3 18M12 5v3m0 4v3m0 4v2" /></>,
+    light: <><path d="M9 18h6M10 22h4M8 14a7 7 0 1 1 8 0c-.8.6-1 1.2-1 2H9c0-.8-.2-1.4-1-2Z" /></>,
+    trash: <><path d="M4 7h16M10 11v6M14 11v6M6 7l1 14h10l1-14M9 7V4h6v3" /></>,
+    water: <><path d="M12 3s7 8 7 12a7 7 0 0 1-14 0c0-4 7-12 7-12Z" /><path d="M9 16a3 3 0 0 0 3 2" /></>,
+    leaf: <><path d="M20 4c-9 0-15 4-15 11a5 5 0 0 0 5 5c7 0 11-6 10-16Z" /><path d="M5 20c3-5 7-8 12-11" /></>,
+    car: <><path d="m5 11 2-5h10l2 5M3 11h18v7H3zM6 18v2m12-2v2" /><circle cx="7" cy="15" r="1" /><circle cx="17" cy="15" r="1" /></>,
+    warning: <><path d="m12 3 10 18H2z" /><path d="M12 9v5m0 3v.01" /></>,
+    wrench: <><path d="M14 6a5 5 0 0 0-6 6L3 17a2 2 0 0 0 3 3l5-5a5 5 0 0 0 6-6l-3 3-3-3z" /></>,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
+    heart: <path d="M20.8 8.8c0 5.5-8.8 11-8.8 11s-8.8-5.5-8.8-11a4.8 4.8 0 0 1 8.8-2.5 4.8 4.8 0 0 1 8.8 2.5Z" />,
+    like: <><path d="M7 10v11H4V10zM7 20h9a2 2 0 0 0 2-1.6l1.5-7A2 2 0 0 0 17.5 9H13l.7-3.2A2.3 2.3 0 0 0 11.5 3L7 10" /></>
+  };
 
   return (
-    <svg {...common}>
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+    <svg {...common} aria-hidden="true">
+      {icons[type] || icons.user}
     </svg>
   );
 };
@@ -273,7 +293,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
           </div>
         </div>
         <div className="sac-user-profile">
-          <span className="sac-user-avatar">👤</span>
+          <span className="sac-user-avatar"><Icon type="user" size={17} /></span>
           <span className="sac-user-name">{nombreUsuario}</span>
           <span className="sac-user-arrow">⌄</span>
           {onLogout && (
@@ -293,7 +313,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               className={`sac-nav-item ${activeNav === "home" ? "active" : ""}`}
               onClick={() => navigateTo("home")}
             >
-              <span className="sac-nav-icon">🏠</span>
+              <span className="sac-nav-icon"><Icon type="home" size={19} /></span>
               <span>Inicio</span>
             </button>
             <button
@@ -301,19 +321,19 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               className={`sac-nav-item ${activeNav === "reportes" ? "active" : ""}`}
               onClick={() => navigateTo("mis-reportes")}
             >
-              <span className="sac-nav-icon">📄</span>
+              <span className="sac-nav-icon"><Icon type="file" size={19} /></span>
               <span>Reportes</span>
             </button>
             <button type="button" className="sac-nav-item" onClick={() => navigateTo("mapa")}>
-              <span className="sac-nav-icon">🗺️</span>
+              <span className="sac-nav-icon"><Icon type="map" size={19} /></span>
               <span>Mapa</span>
             </button>
             <button type="button" className="sac-nav-item" onClick={() => navigateTo("notificaciones")}>
-              <span className="sac-nav-icon">🔔</span>
+              <span className="sac-nav-icon"><Icon type="bell" size={19} /></span>
               <span>Notificaciones</span>
             </button>
             <button type="button" className="sac-nav-item" onClick={() => navigateTo("perfil")}>
-              <span className="sac-nav-icon">👤</span>
+              <span className="sac-nav-icon"><Icon type="user" size={19} /></span>
               <span>Perfil</span>
             </button>
           </nav>
@@ -354,7 +374,7 @@ function Dashboard({ navigateTo, user, onLogout }) {
         onClick={() => navigateTo("reportar-form")}
       >
         <div className="sac-hero-left">
-          <div className="sac-megaphone-icon">📢</div>
+          <div className="sac-megaphone-icon"><Icon type="megaphone" size={27} /></div>
           <div className="sac-hero-text">
             <h2>Reportar un problema</h2>
             <p>Tu aporte hace la diferencia</p>
@@ -366,19 +386,19 @@ function Dashboard({ navigateTo, user, onLogout }) {
       {/* Tarjetas de Accesos Rápidos */}
       <div className="sac-dashboard-grid">
         <div className="sac-dash-card" onClick={() => navigateTo("mis-reportes")}>
-          <div className="sac-dash-card-icon orange-bg">📋</div>
+          <div className="sac-dash-card-icon orange-bg"><Icon type="clipboard" size={21} /></div>
           <h3>Mis reportes</h3>
           <p>Revisá el estado de tus reportes</p>
         </div>
 
-        <div className="sac-dash-card">
-          <div className="sac-dash-card-icon orange-bg">📍</div>
+        <div className="sac-dash-card" onClick={() => navigateTo("mapa")}>
+          <div className="sac-dash-card-icon orange-bg"><Icon type="pin" size={21} /></div>
           <h3>Problemas del barrio</h3>
           <p>Conocé los problemas más comunes</p>
         </div>
 
         <div className="sac-dash-card">
-          <div className="sac-dash-card-icon orange-bg">📖</div>
+          <div className="sac-dash-card-icon orange-bg"><Icon type="book" size={21} /></div>
           <h3>Guía de uso</h3>
           <p>Aprendé a usar el sistema</p>
         </div>
@@ -429,7 +449,7 @@ function ReportForm({ navigateTo, onLogout }) {
           <div className="sac-form-group">
             <label className="sac-label">Agregar una foto (opcional)</label>
             <div className="sac-upload-box">
-              <div className="sac-camera-icon">📷</div>
+              <div className="sac-camera-icon"><Icon type="camera" size={23} /></div>
               <p>Seleccioná una imagen<br />o arrastrala aquí</p>
             </div>
           </div>
@@ -446,17 +466,17 @@ function ReportForm({ navigateTo, onLogout }) {
         <div className="sac-categories-sidebar">
           <h3>Categorías</h3>
           <ul className="sac-categories-list">
-            <li><span className="cat-icon">🚧</span> Calles y veredas</li>
-            <li><span className="cat-icon">💡</span> Alumbrado</li>
-            <li><span className="cat-icon">🗑️</span> Basura</li>
-            <li><span className="cat-icon">🚰</span> Agua</li>
-            <li><span className="cat-icon">🌱</span> Espacios verdes</li>
-            <li><span className="cat-icon">🚗</span> Tránsito</li>
-            <li><span className="cat-icon">⚠️</span> Señalización</li>
-            <li><span className="cat-icon">🔧</span> Otro</li>
+            <li><span className="cat-icon"><Icon type="road" size={17} /></span> Calles y veredas</li>
+            <li><span className="cat-icon"><Icon type="light" size={17} /></span> Alumbrado</li>
+            <li><span className="cat-icon"><Icon type="trash" size={17} /></span> Basura</li>
+            <li><span className="cat-icon"><Icon type="water" size={17} /></span> Agua</li>
+            <li><span className="cat-icon"><Icon type="leaf" size={17} /></span> Espacios verdes</li>
+            <li><span className="cat-icon"><Icon type="car" size={17} /></span> Tránsito</li>
+            <li><span className="cat-icon"><Icon type="warning" size={17} /></span> Señalización</li>
+            <li><span className="cat-icon"><Icon type="wrench" size={17} /></span> Otro</li>
           </ul>
 
-          <div className="sac-plant-decoration">🪴</div>
+          <div className="sac-plant-decoration"><Icon type="leaf" size={26} /></div>
         </div>
       </div>
     </AppLayout>
@@ -694,10 +714,57 @@ export default function App() {
 
 /* Pantalla: Mapa (S.A.C. - Pantalla 6) */
 function MapScreen({ navigateTo, onLogout }) {
+  const [reports, setReports] = useState([]);
+  const [selectedReportId, setSelectedReportId] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    async function cargarReportes() {
+      try {
+        const data = await apiFetch("/reportes/todos");
+        const loadedReports = data.reportes || [];
+        setReports(loadedReports);
+        setSelectedReportId(loadedReports[0]?.id_reporte ?? null);
+      } catch (error) {
+        setErrorMessage(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    cargarReportes();
+  }, []);
+
+  const reportsWithLocation = reports.filter((report) =>
+    report.latitud !== null && report.latitud !== "" &&
+    report.longitud !== null && report.longitud !== "" &&
+    Number.isFinite(Number(report.latitud)) && Number.isFinite(Number(report.longitud))
+  );
+  const selectedReport = reports.find((report) => report.id_reporte === selectedReportId) || reports[0];
+  const latitudes = reportsWithLocation.map((report) => Number(report.latitud));
+  const longitudes = reportsWithLocation.map((report) => Number(report.longitud));
+  const minLatitude = Math.min(...latitudes);
+  const maxLatitude = Math.max(...latitudes);
+  const minLongitude = Math.min(...longitudes);
+  const maxLongitude = Math.max(...longitudes);
+
+  const getPinPosition = (report) => ({
+    top: `${maxLatitude === minLatitude ? 50 : 10 + ((maxLatitude - Number(report.latitud)) / (maxLatitude - minLatitude)) * 80}%`,
+    left: `${maxLongitude === minLongitude ? 50 : 10 + ((Number(report.longitud) - minLongitude) / (maxLongitude - minLongitude)) * 80}%`
+  });
+
+  const getStatusClass = (status) => {
+    const normalizedStatus = (status || "pendiente").toLowerCase();
+    if (normalizedStatus.includes("resuelt")) return "green";
+    if (normalizedStatus.includes("proceso")) return "yellow";
+    return "red";
+  };
+
   return (
     <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
-      <p className="sac-page-subtitle">Explorá los reportes de tu zona</p>
+      <p className="sac-page-subtitle">Explorá los problemas reportados en tu barrio</p>
 
       <div className="sac-map-legend">
         <div className="sac-legend-item">
@@ -710,32 +777,69 @@ function MapScreen({ navigateTo, onLogout }) {
         </div>
         <div className="sac-legend-item">
           <span className="legend-dot green"></span>
-          <span>Resuelto</span>*/** */
+          <span>Resuelto</span>
         </div>
       </div>
 
       <div className="sac-map-canvas">
         <div className="sac-map-grid-overlay" />
         <div className="sac-map-river" />
-        <div className="sac-map-pin red" style={{ top: '25%', left: '44%' }}>📍</div>
-        <div className="sac-map-pin red" style={{ top: '50%', left: '54%' }}>📍</div>
-        <div className="sac-map-pin red" style={{ top: '68%', left: '43%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '51%', left: '38%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '63%', left: '63%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '68%', left: '26%' }}>📍</div>
-        <div className="sac-map-pin green" style={{ top: '46%', left: '23%' }}>📍</div>
-        <div className="sac-map-pin green" style={{ top: '41%', left: '68%' }}>📍</div>
+        {reportsWithLocation.map((report) => (
+          <button
+            key={report.id_reporte}
+            type="button"
+            className={`sac-map-pin ${getStatusClass(report.estado)} ${selectedReport?.id_reporte === report.id_reporte ? "selected" : ""}`}
+            style={getPinPosition(report)}
+            aria-label={`Ver ${report.titulo}`}
+            title={report.titulo}
+            onClick={() => setSelectedReportId(report.id_reporte)}
+          >
+            <Icon type="pin" size={24} />
+          </button>
+        ))}
       </div>
 
-      <div className="sac-map-preview-card" onClick={() => navigateTo("detalle-reporte")}>
-        <div className="sac-report-thumb">FOTO</div>
-        <div className="sac-report-info">
-          <h3>Bache en la calle</h3>
-          <p>Calle 12 y 5 • 08/09/2026</p>
-          <span className="sac-status-badge status-in-process small-badge">En proceso</span>
-        </div>
-        <div className="sac-map-preview-arrow">▶</div>
-      </div>
+      {loading ? (
+        <p>Cargando problemas del barrio...</p>
+      ) : errorMessage ? (
+        <p role="alert">No se pudieron cargar los reportes: {errorMessage}</p>
+      ) : reports.length === 0 ? (
+        <p>Todavía no hay problemas reportados.</p>
+      ) : (
+        <>
+          {selectedReport && (
+            <div className="sac-map-preview-card">
+              <div className="sac-report-thumb">{selectedReport.foto ? "IMG" : <Icon type="pin" size={19} />}</div>
+              <div className="sac-report-info">
+                <h3>{selectedReport.titulo}</h3>
+                <p>{selectedReport.direccion} • {new Date(selectedReport.fecha_reporte).toLocaleDateString("es-AR")}</p>
+                <span className={`sac-status-badge status-${getStatusClass(selectedReport.estado) === "red" ? "pending" : getStatusClass(selectedReport.estado) === "yellow" ? "in-process" : "resolved"} small-badge`}>
+                  {selectedReport.estado || "Pendiente"}
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="sac-reports-list">
+            {reports.map((report) => (
+              <button
+                className="sac-report-card clickable"
+                key={report.id_reporte}
+                type="button"
+                onClick={() => setSelectedReportId(report.id_reporte)}
+              >
+                <div className="sac-report-info">
+                  <h3>{report.titulo}</h3>
+                  <p>{report.direccion} • {new Date(report.fecha_reporte).toLocaleDateString("es-AR")}</p>
+                </div>
+                <span className={`sac-status-badge status-${getStatusClass(report.estado) === "red" ? "pending" : getStatusClass(report.estado) === "yellow" ? "in-process" : "resolved"}`}>
+                  {report.estado || "Pendiente"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </AppLayout>
   );
 }
@@ -817,7 +921,7 @@ function NotificationsScreen({ navigateTo, user, onLogout }) {
         ) : (
           items.map((item) => (
             <div className="sac-report-card" key={item.id_notificacion}>
-              <div className="sac-report-thumb">🔔</div>
+              <div className="sac-report-thumb"><Icon type="bell" size={19} /></div>
               <div className="sac-report-info">
                 <h3>{item.tipo || "Nuevo aviso"}</h3>
                 <p>{item.mensaje}</p>
@@ -861,15 +965,15 @@ function ReportDetail({ navigateTo }) {
         
         <div className="sac-detail-meta-bar">
           <div className="sac-meta-item">
-            <span className="sac-meta-icon">📍</span>
+            <span className="sac-meta-icon"><Icon type="pin" size={16} /></span>
             <span>Calle 12 y 5</span>
           </div>
           <div className="sac-meta-item">
-            <span className="sac-meta-icon">📅</span>
+            <span className="sac-meta-icon"><Icon type="calendar" size={16} /></span>
             <span>08/09/2026</span>
           </div>
           <div className="sac-meta-item">
-            <span className="sac-meta-icon">🧡</span>
+            <span className="sac-meta-icon"><Icon type="heart" size={16} /></span>
             <span>{likes} vecinos lo apoyaron</span>
           </div>
         </div>
@@ -892,7 +996,7 @@ function ReportDetail({ navigateTo }) {
           className={`sac-support-button ${hasLiked ? "supported" : ""}`}
           onClick={handleSupport}
         >
-          <span className="sac-like-icon">👍</span>
+          <span className="sac-like-icon"><Icon type="like" size={18} /></span>
           <span>{hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
         </button>
       </div>
