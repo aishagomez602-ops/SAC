@@ -14,14 +14,19 @@ function getStoredUser() {
 
 async function apiFetch(endpoint, options = {}) {
   const token = localStorage.getItem("sac_token");
+  const { headers: customHeaders, ...fetchOptions } = options;
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(customHeaders || {})
+  };
+
+  if (!(options.body instanceof FormData)) {
+    headers["Content-Type"] = headers["Content-Type"] || "application/json";
+  }
 
   const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {})
-    },
-    ...options
+    ...fetchOptions,
+    headers
   });
 
   const contentType = response.headers.get("content-type") || "";
@@ -428,72 +433,223 @@ function Dashboard({ navigateTo, user, onLogout }) {
 }
 
 /* Pantalla 4: Formulario de Reporte */
-function ReportForm({ navigateTo, onLogout }) {
+function ReportForm({ navigateTo, user, onLogout }) {
+  const [categories, setCategories] = useState([]);
+  const [categoryError, setCategoryError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [description, setDescription] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [location, setLocation] = useState(null);
+
+  useEffect(() => {
+    async function cargarCategorias() {
+      try {
+        const data = await apiFetch("/categorias");
+        setCategories(data.categorias || []);
+      } catch (error) {
+        setCategoryError(error.message);
+      }
+    }
+
+    cargarCategorias();
+  }, []);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setFormError("");
+
+    if (!location) {
+      setFormError("Indicá la ubicación del problema antes de enviar el reporte.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    const formData = new FormData(event.currentTarget);
+    const selectedCategory = categories.find(
+      (category) => String(category.id_categoria) === formData.get("id_categoria")
+    );
+
+    if (!selectedCategory) {
+      setFormError("Elegí una categoría válida para el reporte.");
+      setSubmitting(false);
+      return;
+    }
+
+    formData.set("titulo", selectedCategory.nombre);
+    formData.set("latitud", String(location.latitude));
+    formData.set("longitud", String(location.longitude));
+    if (photo) formData.set("foto", photo);
+
+    try {
+      await apiFetch("/reportes/crear", {
+        method: "POST",
+        body: formData
+      });
+      navigateTo("mis-reportes");
+    } catch (error) {
+      setFormError(error.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleGetLocation = () => {
+    setFormError("");
+
+    if (!navigator.geolocation) {
+      setFormError("Este navegador no permite obtener la ubicación. Probá con otro navegador.");
+      return;
+    }
+
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        setLocation({ latitude: coords.latitude, longitude: coords.longitude });
+        setLocating(false);
+      },
+      (error) => {
+        const messages = {
+          1: "No se otorgó permiso para acceder a la ubicación.",
+          2: "No se pudo determinar la ubicación. Intentá nuevamente.",
+          3: "Se agotó el tiempo para obtener la ubicación. Intentá nuevamente."
+        };
+        setFormError(messages[error.code] || "No se pudo obtener la ubicación.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  const handlePhotoChange = (event) => {
+    const selectedPhoto = event.currentTarget.files?.[0] || null;
+    setFormError("");
+
+    if (selectedPhoto && selectedPhoto.size > 5 * 1024 * 1024) {
+      event.currentTarget.value = "";
+      setPhoto(null);
+      setFormError("La foto no puede superar los 5 MB.");
+      return;
+    }
+
+    if (selectedPhoto && !selectedPhoto.type.startsWith("image/")) {
+      event.currentTarget.value = "";
+      setPhoto(null);
+      setFormError("El archivo seleccionado no es una imagen válida.");
+      return;
+    }
+
+    setPhoto(selectedPhoto);
+  };
+
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" onLogout={onLogout}>
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Reportar un problema</h1>
       <p className="sac-page-subtitle">Completá la información para enviar tu reporte</p>
 
       <div className="sac-report-layout">
         {/* Formulario Principal */}
-        <div className="sac-form-container">
+        <form className="sac-form-container" onSubmit={handleSubmit}>
           <div className="sac-form-group">
-            <label className="sac-label">Categoría</label>
+            <label className="sac-label" htmlFor="report-category">Categoría</label>
             <div className="sac-select-wrapper">
-              <select className="sac-select" defaultValue="">
+              <select className="sac-select" id="report-category" name="id_categoria" defaultValue="" required>
                 <option value="" disabled>Elegí el tipo de problema</option>
-                <option value="calles">Calles y veredas</option>
-                <option value="alumbrado">Alumbrado</option>
-                <option value="basura">Basura</option>
-                <option value="agua">Agua</option>
-                <option value="espacios">Espacios verdes</option>
-                <option value="transito">Tránsito</option>
-                <option value="senalizacion">Señalización</option>
-                <option value="otro">Otro</option>
+                {categories.map((category) => (
+                  <option key={category.id_categoria} value={category.id_categoria}>{category.nombre}</option>
+                ))}
               </select>
             </div>
+            {categoryError && <p className="error-message" role="alert">No se pudieron cargar las categorías: {categoryError}</p>}
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Descripción</label>
+            <label className="sac-label" htmlFor="report-address">Dirección</label>
+            <input
+              className="sac-input"
+              id="report-address"
+              name="direccion"
+              type="text"
+              placeholder="Calle y altura o esquina"
+              maxLength={255}
+              required
+            />
+          </div>
+
+          <div className="sac-form-group">
+            <span className="sac-label">Ubicación en el mapa</span>
+            <button
+              className="sac-location-btn"
+              type="button"
+              onClick={handleGetLocation}
+              disabled={locating || submitting}
+            >
+              <Icon type="pin" size={17} />
+              {locating ? "Obteniendo ubicación..." : location ? "Actualizar ubicación" : "Usar mi ubicación actual"}
+            </button>
+            <p className="sac-location-description">
+              Permití el acceso a tu ubicación para señalar dónde está el problema.
+            </p>
+            {location && (
+              <p className="sac-location-coordinates" role="status">
+                Ubicación registrada: {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
+              </p>
+            )}
+          </div>
+
+          <div className="sac-form-group">
+            <label className="sac-label" htmlFor="report-description">Descripción</label>
             <div className="sac-textarea-wrapper">
               <textarea
                 className="sac-textarea"
+                id="report-description"
+                name="descripcion"
                 placeholder="Contanos qué sucede..."
                 maxLength={500}
-              ></textarea>
-              <span className="sac-char-count">0/500</span>
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                required
+              />
+              <span className="sac-char-count">{description.length}/500</span>
             </div>
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Agregar una foto (opcional)</label>
-            <div className="sac-upload-box">
+            <label className="sac-label" htmlFor="report-photo">Agregar una foto (opcional)</label>
+            <label className="sac-upload-box" htmlFor="report-photo">
               <div className="sac-camera-icon"><Icon type="camera" size={23} /></div>
-              <p>Seleccioná una imagen<br />o arrastrala aquí</p>
-            </div>
+              <p>
+                {photo ? (
+                  <><strong>{photo.name}</strong><br />Seleccioná para cambiar la foto</>
+                ) : (
+                  <>Seleccioná una imagen<br />(5 MB máximo)</>
+                )}
+              </p>
+            </label>
+            <input
+              className="sac-file-input"
+              id="report-photo"
+              type="file"
+              accept="image/*"
+              onChange={handlePhotoChange}
+            />
           </div>
 
-          <button
-            className="sac-primary-btn"
-            onClick={() => navigateTo("mis-reportes")}
-          >
-            Enviar reporte
+          {formError && <p className="error-message" role="alert">{formError}</p>}
+          <button className="sac-primary-btn" type="submit" disabled={submitting || categories.length === 0}>
+            {submitting ? "Enviando..." : "Enviar reporte"}
           </button>
-        </div>
+        </form>
 
         {/* Menú Lateral de Categorías */}
         <div className="sac-categories-sidebar">
           <h3>Categorías</h3>
           <ul className="sac-categories-list">
-            <li><span className="cat-icon"><Icon type="road" size={17} /></span> Calles y veredas</li>
-            <li><span className="cat-icon"><Icon type="light" size={17} /></span> Alumbrado</li>
-            <li><span className="cat-icon"><Icon type="trash" size={17} /></span> Basura</li>
-            <li><span className="cat-icon"><Icon type="water" size={17} /></span> Agua</li>
-            <li><span className="cat-icon"><Icon type="leaf" size={17} /></span> Espacios verdes</li>
-            <li><span className="cat-icon"><Icon type="car" size={17} /></span> Tránsito</li>
-            <li><span className="cat-icon"><Icon type="warning" size={17} /></span> Señalización</li>
-            <li><span className="cat-icon"><Icon type="wrench" size={17} /></span> Otro</li>
+            {categories.map((category) => (
+              <li key={category.id_categoria}>{category.nombre}</li>
+            ))}
           </ul>
 
           <div className="sac-plant-decoration"><Icon type="leaf" size={26} /></div>
@@ -504,10 +660,11 @@ function ReportForm({ navigateTo, onLogout }) {
 }
 
 /* Pantalla 5: Lista de Mis Reportes */
-function MyReports({ navigateTo, onLogout }) {
+function MyReports({ navigateTo, user, onLogout }) {
   const [filter, setFilter] = useState("todos");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function cargarReportes() {
@@ -515,7 +672,7 @@ function MyReports({ navigateTo, onLogout }) {
         const data = await apiFetch("/reportes/mis-reportes");
         setReports(data.reportes || []);
       } catch (error) {
-        console.error(error);
+        setErrorMessage(error.message);
       } finally {
         setLoading(false);
       }
@@ -534,7 +691,7 @@ function MyReports({ navigateTo, onLogout }) {
   });
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" onLogout={onLogout}>
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Mis reportes</h1>
       <p className="sac-page-subtitle">Acá podés ver el estado de todos tus reportes</p>
 
@@ -548,8 +705,10 @@ function MyReports({ navigateTo, onLogout }) {
       <div className="sac-reports-list">
         {loading ? (
           <p>Cargando reportes...</p>
+        ) : errorMessage ? (
+          <p className="error-message" role="alert">No se pudieron cargar tus reportes: {errorMessage}</p>
         ) : filteredReports.length === 0 ? (
-          <p>No tenés reportes en esta categoría.</p>
+          <p>{reports.length === 0 ? "Todavía no enviaste ningún reporte." : "No tenés reportes en esta categoría."}</p>
         ) : (
           filteredReports.map((item) => (
             <div className="sac-report-card" key={item.id_reporte}>
@@ -698,16 +857,16 @@ export default function App() {
     return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "reportar-form") {
-    return <ReportForm navigateTo={setScreen} onLogout={handleLogout} />;
+    return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "mis-reportes") {
-    return <MyReports navigateTo={setScreen} onLogout={handleLogout} />;
+    return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "mapa") {
-    return <MapScreen navigateTo={setScreen} onLogout={handleLogout} />;
+    return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "detalle-reporte") {
-    return <ReportDetail navigateTo={setScreen} />;
+    return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "perfil") {
     return <ProfileScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
@@ -733,7 +892,7 @@ export default function App() {
 }
 
 /* Pantalla: Mapa (S.A.C. - Pantalla 6) */
-function MapScreen({ navigateTo, onLogout }) {
+function MapScreen({ navigateTo, user, onLogout }) {
   const [reports, setReports] = useState([]);
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -772,7 +931,7 @@ function MapScreen({ navigateTo, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" onLogout={onLogout}>
+    <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
       <p className="sac-page-subtitle">Seleccioná un reporte para ver su ubicación en Google Maps</p>
 
@@ -946,7 +1105,7 @@ function NotificationsScreen({ navigateTo, user, onLogout }) {
 }
 
 /* Pantalla: Detalle del reporte (S.A.C. - Pantalla 7) */
-function ReportDetail({ navigateTo }) {
+function ReportDetail({ navigateTo, user, onLogout }) {
   const [likes, setLikes] = useState(12);
   const [hasLiked, setHasLiked] = useState(false);
 
@@ -961,7 +1120,7 @@ function ReportDetail({ navigateTo }) {
   };
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="7">
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="7" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Detalle del reporte</h1>
       <p className="sac-page-subtitle">Información y seguimiento</p>
 
