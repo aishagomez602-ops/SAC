@@ -35,6 +35,26 @@ async function apiFetch(endpoint, options = {}) {
   return data;
 } 
 
+function getReportCoordinates(report) {
+  if (
+    report?.latitud === null || report?.latitud === undefined || report.latitud === "" ||
+    report?.longitud === null || report?.longitud === undefined || report.longitud === ""
+  ) {
+    return null;
+  }
+
+  const latitude = Number(report.latitud);
+  const longitude = Number(report.longitud);
+  if (
+    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+    !Number.isFinite(longitude) || longitude < -180 || longitude > 180
+  ) {
+    return null;
+  }
+
+  return { latitude, longitude };
+}
+
 const Icon = ({ type, size = 22 }) => {
   const common = {
     width: size,
@@ -725,7 +745,8 @@ function MapScreen({ navigateTo, onLogout }) {
         const data = await apiFetch("/reportes/todos");
         const loadedReports = data.reportes || [];
         setReports(loadedReports);
-        setSelectedReportId(loadedReports[0]?.id_reporte ?? null);
+        const firstReportWithLocation = loadedReports.find((report) => getReportCoordinates(report));
+        setSelectedReportId(firstReportWithLocation?.id_reporte ?? loadedReports[0]?.id_reporte ?? null);
       } catch (error) {
         setErrorMessage(error.message);
       } finally {
@@ -736,23 +757,12 @@ function MapScreen({ navigateTo, onLogout }) {
     cargarReportes();
   }, []);
 
-  const reportsWithLocation = reports.filter((report) =>
-    report.latitud !== null && report.latitud !== "" &&
-    report.longitud !== null && report.longitud !== "" &&
-    Number.isFinite(Number(report.latitud)) && Number.isFinite(Number(report.longitud))
-  );
-  const selectedReport = reports.find((report) => report.id_reporte === selectedReportId) || reports[0];
-  const latitudes = reportsWithLocation.map((report) => Number(report.latitud));
-  const longitudes = reportsWithLocation.map((report) => Number(report.longitud));
-  const minLatitude = Math.min(...latitudes);
-  const maxLatitude = Math.max(...latitudes);
-  const minLongitude = Math.min(...longitudes);
-  const maxLongitude = Math.max(...longitudes);
-
-  const getPinPosition = (report) => ({
-    top: `${maxLatitude === minLatitude ? 50 : 10 + ((maxLatitude - Number(report.latitud)) / (maxLatitude - minLatitude)) * 80}%`,
-    left: `${maxLongitude === minLongitude ? 50 : 10 + ((Number(report.longitud) - minLongitude) / (maxLongitude - minLongitude)) * 80}%`
-  });
+  const reportsWithLocation = reports.filter((report) => getReportCoordinates(report));
+  const selectedReport = reports.find((report) => report.id_reporte === selectedReportId) || reportsWithLocation[0] || reports[0];
+  const selectedCoordinates = getReportCoordinates(selectedReport);
+  const googleMapsUrl = selectedCoordinates
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedCoordinates.latitude},${selectedCoordinates.longitude}`)}`
+    : null;
 
   const getStatusClass = (status) => {
     const normalizedStatus = (status || "pendiente").toLowerCase();
@@ -764,39 +774,26 @@ function MapScreen({ navigateTo, onLogout }) {
   return (
     <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
-      <p className="sac-page-subtitle">Explorá los problemas reportados en tu barrio</p>
-
-      <div className="sac-map-legend">
-        <div className="sac-legend-item">
-          <span className="legend-dot red"></span>
-          <span>Pendiente</span>
-        </div>
-        <div className="sac-legend-item">
-          <span className="legend-dot yellow"></span>
-          <span>En proceso</span>
-        </div>
-        <div className="sac-legend-item">
-          <span className="legend-dot green"></span>
-          <span>Resuelto</span>
-        </div>
-      </div>
+      <p className="sac-page-subtitle">Seleccioná un reporte para ver su ubicación en Google Maps</p>
 
       <div className="sac-map-canvas">
-        <div className="sac-map-grid-overlay" />
-        <div className="sac-map-river" />
-        {reportsWithLocation.map((report) => (
-          <button
-            key={report.id_reporte}
-            type="button"
-            className={`sac-map-pin ${getStatusClass(report.estado)} ${selectedReport?.id_reporte === report.id_reporte ? "selected" : ""}`}
-            style={getPinPosition(report)}
-            aria-label={`Ver ${report.titulo}`}
-            title={report.titulo}
-            onClick={() => setSelectedReportId(report.id_reporte)}
-          >
-            <Icon type="pin" size={24} />
-          </button>
-        ))}
+        {loading ? (
+          <p className="sac-map-empty">Cargando mapa y ubicaciones...</p>
+        ) : selectedCoordinates ? (
+          <iframe
+            className="sac-google-map"
+            title={`Ubicación del reporte: ${selectedReport.titulo}`}
+            src={`https://maps.google.com/maps?q=${selectedCoordinates.latitude},${selectedCoordinates.longitude}&z=15&output=embed`}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+        ) : (
+          <p className="sac-map-empty">
+            {reports.length === 0
+              ? "Todavía no hay problemas reportados."
+              : "Este reporte no tiene una ubicación cargada."}
+          </p>
+        )}
       </div>
 
       {loading ? (
@@ -817,13 +814,24 @@ function MapScreen({ navigateTo, onLogout }) {
                   {selectedReport.estado || "Pendiente"}
                 </span>
               </div>
+              {googleMapsUrl && (
+                <a className="sac-map-link" href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
+                  Abrir en Google Maps
+                </a>
+              )}
             </div>
+          )}
+
+          {reportsWithLocation.length === 0 && (
+            <p className="sac-map-location-note">
+              Los reportes todavía no tienen coordenadas. Cuando se cargue una ubicación, aparecerá en el mapa.
+            </p>
           )}
 
           <div className="sac-reports-list">
             {reports.map((report) => (
               <button
-                className="sac-report-card clickable"
+                className={`sac-report-card clickable ${selectedReport?.id_reporte === report.id_reporte ? "selected" : ""}`}
                 key={report.id_reporte}
                 type="button"
                 onClick={() => setSelectedReportId(report.id_reporte)}
@@ -831,6 +839,9 @@ function MapScreen({ navigateTo, onLogout }) {
                 <div className="sac-report-info">
                   <h3>{report.titulo}</h3>
                   <p>{report.direccion} • {new Date(report.fecha_reporte).toLocaleDateString("es-AR")}</p>
+                  <span className="sac-map-location-label">
+                    {getReportCoordinates(report) ? "Ver ubicación en el mapa" : "Ubicación no disponible"}
+                  </span>
                 </div>
                 <span className={`sac-status-badge status-${getStatusClass(report.estado) === "red" ? "pending" : getStatusClass(report.estado) === "yellow" ? "in-process" : "resolved"}`}>
                   {report.estado || "Pendiente"}
@@ -1003,4 +1014,3 @@ function ReportDetail({ navigateTo }) {
     </AppLayout>
   );
 }
-
