@@ -361,6 +361,16 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               <span className="sac-nav-icon"><Icon type="user" size={19} /></span>
               <span>Perfil</span>
             </button>
+            {user?.rol === "administrador" && (
+              <button
+                type="button"
+                className={`sac-nav-item ${activeNav === "admin" ? "active" : ""}`}
+                onClick={() => navigateTo("admin")}
+              >
+                <span className="sac-nav-icon"><Icon type="clipboard" size={19} /></span>
+                <span>Administración</span>
+              </button>
+            )}
           </nav>
         </aside>
 
@@ -428,6 +438,159 @@ function Dashboard({ navigateTo, user, onLogout }) {
           <p>Aprendé a usar el sistema</p>
         </div>
       </div>
+    </AppLayout>
+  );
+}
+
+function AdminScreen({ navigateTo, user, onLogout }) {
+  const [users, setUsers] = useState([]);
+  const [reports, setReports] = useState([]);
+  const [states, setStates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [savingAction, setSavingAction] = useState("");
+
+  useEffect(() => {
+    async function loadAdminData() {
+      try {
+        const [usersData, reportsData, statesData] = await Promise.all([
+          apiFetch("/admin/usuarios"),
+          apiFetch("/reportes/todos"),
+          apiFetch("/admin/estados")
+        ]);
+
+        setUsers(usersData.usuarios || []);
+        setReports(reportsData.reportes || []);
+        setStates(statesData.estados || []);
+      } catch (error) {
+        setErrorMessage(error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAdminData();
+  }, []);
+
+  const updateUserRole = async (idUsuario, rol) => {
+    setSavingAction(`user-${idUsuario}`);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const data = await apiFetch(`/admin/usuarios/${idUsuario}/rol`, {
+        method: "PUT",
+        body: JSON.stringify({ rol })
+      });
+      setUsers((currentUsers) => currentUsers.map((item) => (
+        item.id_usuario === idUsuario ? { ...item, rol } : item
+      )));
+      setSuccessMessage(data.mensaje);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setSavingAction("");
+    }
+  };
+
+  const updateReportState = async (idReporte, idEstado) => {
+    setSavingAction(`report-${idReporte}`);
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    try {
+      const data = await apiFetch(`/admin/reportes/${idReporte}/estado`, {
+        method: "PUT",
+        body: JSON.stringify({ id_estado: idEstado })
+      });
+      const newState = states.find((item) => item.id_estado === Number(idEstado));
+      setReports((currentReports) => currentReports.map((item) => (
+        item.id_reporte === idReporte ? { ...item, estado: newState?.nombre || item.estado } : item
+      )));
+      setSuccessMessage(data.mensaje);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setSavingAction("");
+    }
+  };
+
+  return (
+    <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Administración</h1>
+      <p className="sac-page-subtitle">Gestioná usuarios, roles y reportes del sistema</p>
+
+      {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
+      {successMessage && <p className="success-message" role="status">{successMessage}</p>}
+
+      {loading ? (
+        <p>Cargando información de administración...</p>
+      ) : (
+        <>
+          <section className="sac-admin-section">
+            <h2>Usuarios y roles</h2>
+            {users.length === 0 ? (
+              <p>No hay usuarios registrados.</p>
+            ) : (
+              <div className="sac-admin-list">
+                {users.map((item) => (
+                  <div className="sac-admin-row" key={item.id_usuario}>
+                    <div>
+                      <strong>{item.nombre} {item.apellido}</strong>
+                      <span>{item.email}</span>
+                    </div>
+                    <label className="sac-admin-control">
+                      <span>Rol</span>
+                      <select
+                        className="sac-select"
+                        value={item.rol}
+                        disabled={savingAction === `user-${item.id_usuario}` || item.id_usuario === user?.id_usuario}
+                        onChange={(event) => updateUserRole(item.id_usuario, event.target.value)}
+                      >
+                        <option value="vecino">Vecino</option>
+                        <option value="administrador">Administrador</option>
+                      </select>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="sac-admin-section">
+            <h2>Reportes</h2>
+            {reports.length === 0 ? (
+              <p>No hay reportes para gestionar.</p>
+            ) : (
+              <div className="sac-admin-list">
+                {reports.map((report) => (
+                  <div className="sac-admin-row" key={report.id_reporte}>
+                    <div>
+                      <strong>{report.titulo}</strong>
+                      <span>{report.direccion} · {report.vecino}</span>
+                    </div>
+                    <label className="sac-admin-control">
+                      <span>Estado</span>
+                      <select
+                        className="sac-select"
+                        value={states.find((item) => item.nombre === report.estado)?.id_estado || ""}
+                        disabled={savingAction === `report-${report.id_reporte}`}
+                        onChange={(event) => updateReportState(report.id_reporte, event.target.value)}
+                      >
+                        <option value="" disabled>Seleccioná un estado</option>
+                        {states.map((item) => (
+                          <option key={item.id_estado} value={item.id_estado}>{item.nombre}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      )}
     </AppLayout>
   );
 }
@@ -855,6 +1018,9 @@ export default function App() {
 
   if (screen === "home") {
     return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
+  if (screen === "admin" && user?.rol === "administrador") {
+    return <AdminScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
   if (screen === "reportar-form") {
     return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;

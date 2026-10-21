@@ -11,6 +11,44 @@ const router = express.Router();
 
 
 // ========================================
+// VER ESTADOS DISPONIBLES
+// ========================================
+
+router.get(
+    "/estados",
+    verificarToken,
+    verificarAdministrador,
+    async (req, res) => {
+
+        try {
+
+            const [estados] =
+                await conexion.query(
+                    `SELECT id_estado, nombre
+                     FROM estados
+                     ORDER BY id_estado`
+                );
+
+            res.json({
+                ok: true,
+                estados
+            });
+
+        } catch (error) {
+
+            console.error(error);
+
+            res.status(500).json({
+                ok: false,
+                mensaje:
+                    "No se pudieron obtener los estados"
+            });
+        }
+    }
+);
+
+
+// ========================================
 // VER TODOS LOS USUARIOS
 // ========================================
 

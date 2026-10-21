@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const conexion = require("../db");
 
 function verificarToken(req, res, next) {
 
@@ -42,16 +43,39 @@ function verificarToken(req, res, next) {
     }
 }
 
-function verificarAdministrador(req, res, next) {
+async function verificarAdministrador(req, res, next) {
 
-    if (req.usuario.rol !== "administrador") {
-        return res.status(403).json({
+    try {
+        const [usuarios] = await conexion.query(
+            `SELECT rol
+             FROM usuarios
+             WHERE id_usuario = ?`,
+            [req.usuario.id_usuario]
+        );
+
+        if (usuarios.length === 0) {
+            return res.status(401).json({
+                ok: false,
+                mensaje: "El usuario ya no existe"
+            });
+        }
+
+        if (usuarios[0].rol !== "administrador") {
+            return res.status(403).json({
+                ok: false,
+                mensaje: "No tenés permisos de administrador"
+            });
+        }
+
+        req.usuario.rol = usuarios[0].rol;
+        next();
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
             ok: false,
-            mensaje: "No tenés permisos de administrador"
+            mensaje: "No se pudo verificar el rol de administrador"
         });
     }
-
-    next();
 }
 
 module.exports = {

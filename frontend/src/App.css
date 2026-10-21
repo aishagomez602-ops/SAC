@@ -894,6 +894,57 @@ button {
   font-weight: 800;
 }
 
+.sac-admin-section {
+  margin-bottom: 24px;
+}
+
+.sac-admin-section h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.sac-admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sac-admin-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.sac-admin-row > div,
+.sac-admin-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.sac-admin-row strong {
+  font-size: 12px;
+}
+
+.sac-admin-row span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sac-admin-control .sac-select {
+  border: 1px solid var(--line);
+}
+
+.sac-admin-control .sac-select:disabled {
+  cursor: not-allowed;
+  opacity: .7;
+}
+
 .status-in-process {
   background: #fef3c7;
   color: #d97706;
@@ -1007,6 +1058,10 @@ button {
 }
 
 @media (max-width: 640px) {
+  .sac-admin-row {
+    grid-template-columns: 1fr;
+  }
+
   .sac-map-canvas {
     height: 360px;
   }
