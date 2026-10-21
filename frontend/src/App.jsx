@@ -311,7 +311,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
       {/* Top Navbar */}
       <header className="sac-navbar">
         <div className="sac-logo-area">
-          <img src="/images/fabicon,fondo.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
+          <img src="/images%20copy/logo%20sin%20descripcion.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
           <div className="sac-brand-titles">
             <span className="sac-brand-main">S.A.C</span>
             <span className="sac-brand-sub">Sistema de Atención Ciudadana</span>
@@ -432,20 +432,91 @@ function Dashboard({ navigateTo, user, onLogout }) {
           <p>Conocé los problemas más comunes</p>
         </div>
 
-        <div className="sac-dash-card">
+        <button className="sac-dash-card" type="button" onClick={() => navigateTo("guia")}>
           <div className="sac-dash-card-icon orange-bg"><Icon type="book" size={21} /></div>
           <h3>Guía de uso</h3>
           <p>Aprendé a usar el sistema</p>
-        </div>
+        </button>
       </div>
     </AppLayout>
   );
 }
 
-function AdminScreen({ navigateTo, user, onLogout }) {
+function GuideScreen({ navigateTo, user, onLogout }) {
+  const guideSteps = [
+    {
+      number: "01",
+      icon: "megaphone",
+      title: "Reportá un problema",
+      description: "Elegí la categoría, indicá la dirección y contá qué sucede. Si podés, agregá una foto y la ubicación para ayudar a identificarlo.",
+      action: "Crear un reporte",
+      target: "reportar-form"
+    },
+    {
+      number: "02",
+      icon: "clipboard",
+      title: "Seguí tus reportes",
+      description: "En “Mis reportes” podés consultar el estado de cada solicitud y revisar las novedades a medida que se actualiza.",
+      action: "Ver mis reportes",
+      target: "mis-reportes"
+    },
+    {
+      number: "03",
+      icon: "map",
+      title: "Explorá el mapa",
+      description: "Consultá los problemas informados en el barrio y abrí la ubicación de cada reporte para orientarte.",
+      action: "Abrir el mapa",
+      target: "mapa"
+    },
+    {
+      number: "04",
+      icon: "bell",
+      title: "Revisá tus notificaciones",
+      description: "Encontrá avisos sobre los cambios de estado y otras novedades relacionadas con tus reportes.",
+      action: "Ver notificaciones",
+      target: "notificaciones"
+    }
+  ];
+
+  return (
+    <AppLayout activeNav="guia" navigateTo={navigateTo} screenNumber="10" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Guía de uso</h1>
+      <p className="sac-page-subtitle">Todo lo que necesitás para participar y mejorar tu barrio</p>
+
+      <div className="sac-guide-intro">
+        <div className="sac-guide-intro-icon"><Icon type="book" size={25} /></div>
+        <div>
+          <h2>¿Cómo funciona S.A.C.?</h2>
+          <p>Usá estos pasos para informar problemas y seguir su resolución.</p>
+        </div>
+      </div>
+
+      <div className="sac-guide-grid">
+        {guideSteps.map((step) => (
+          <article className="sac-guide-card" key={step.number}>
+            <div className="sac-guide-card-heading">
+              <span className="sac-guide-number">{step.number}</span>
+              <span className="sac-guide-icon"><Icon type={step.icon} size={20} /></span>
+            </div>
+            <h2>{step.title}</h2>
+            <p>{step.description}</p>
+            <button className="sac-guide-action" type="button" onClick={() => navigateTo(step.target)}>
+              {step.action} <span aria-hidden="true">→</span>
+            </button>
+          </article>
+        ))}
+      </div>
+    </AppLayout>
+  );
+}
+
+function AdminScreen({ navigateTo, user, onLogout, onUserUpdated }) {
   const [users, setUsers] = useState([]);
   const [reports, setReports] = useState([]);
   const [states, setStates] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [reportSearch, setReportSearch] = useState("");
+  const [reportFilter, setReportFilter] = useState("todos");
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -486,6 +557,9 @@ function AdminScreen({ navigateTo, user, onLogout }) {
       setUsers((currentUsers) => currentUsers.map((item) => (
         item.id_usuario === idUsuario ? { ...item, rol } : item
       )));
+      if (String(idUsuario) === String(user?.id_usuario)) {
+        onUserUpdated({ ...user, rol });
+      }
       setSuccessMessage(data.mensaje);
     } catch (error) {
       setErrorMessage(error.message);
@@ -516,10 +590,36 @@ function AdminScreen({ navigateTo, user, onLogout }) {
     }
   };
 
+  const filteredUsers = users.filter((item) => (
+    `${item.nombre} ${item.apellido} ${item.email}`.toLowerCase().includes(userSearch.trim().toLowerCase())
+  ));
+
+  const filteredReports = reports.filter((report) => {
+    const searchText = `${report.titulo} ${report.direccion} ${report.vecino} ${report.categoria}`.toLowerCase();
+    const matchesSearch = searchText.includes(reportSearch.trim().toLowerCase());
+    const normalizedStatus = (report.estado || "").toLowerCase();
+    const matchesStatus = reportFilter === "todos" ||
+      (reportFilter === "pendiente" && normalizedStatus.includes("pendiente")) ||
+      (reportFilter === "proceso" && normalizedStatus.includes("proceso")) ||
+      (reportFilter === "resuelto" && normalizedStatus.includes("resuelt"));
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const countReportsByStatus = (status) => reports.filter((report) => (
+    (report.estado || "").toLowerCase().includes(status)
+  )).length;
+
   return (
     <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Administración</h1>
-      <p className="sac-page-subtitle">Gestioná usuarios, roles y reportes del sistema</p>
+      <div className="sac-admin-header">
+        <div>
+          <span className="sac-admin-eyebrow">PANEL DE CONTROL</span>
+          <h1 className="sac-page-title">Administración</h1>
+          <p className="sac-page-subtitle">Gestioná usuarios, roles y reportes del sistema</p>
+        </div>
+        <span className="sac-admin-role"><Icon type="clipboard" size={16} /> Administrador</span>
+      </div>
 
       {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
       {successMessage && <p className="success-message" role="status">{successMessage}</p>}
@@ -528,24 +628,69 @@ function AdminScreen({ navigateTo, user, onLogout }) {
         <p>Cargando información de administración...</p>
       ) : (
         <>
+          <section className="sac-admin-stats" aria-label="Resumen del sistema">
+            <article className="sac-admin-stat">
+              <span>Usuarios registrados</span>
+              <strong>{users.length}</strong>
+              <small>Cuentas en el sistema</small>
+            </article>
+            <article className="sac-admin-stat">
+              <span>Reportes recibidos</span>
+              <strong>{reports.length}</strong>
+              <small>Solicitudes ciudadanas</small>
+            </article>
+            <article className="sac-admin-stat">
+              <span>Pendientes</span>
+              <strong>{countReportsByStatus("pendiente")}</strong>
+              <small>Requieren seguimiento</small>
+            </article>
+            <article className="sac-admin-stat">
+              <span>En proceso</span>
+              <strong>{countReportsByStatus("proceso")}</strong>
+              <small>En gestión</small>
+            </article>
+            <article className="sac-admin-stat">
+              <span>Resueltos</span>
+              <strong>{countReportsByStatus("resuelt")}</strong>
+              <small>Casos finalizados</small>
+            </article>
+          </section>
+
           <section className="sac-admin-section">
-            <h2>Usuarios y roles</h2>
+            <div className="sac-admin-section-header">
+              <div>
+                <h2>Usuarios y roles</h2>
+                <p>Administrá los permisos de acceso de cada cuenta.</p>
+              </div>
+              <label className="sac-admin-search">
+                <Icon type="user" size={17} />
+                <input
+                  type="search"
+                  placeholder="Buscar usuario..."
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  aria-label="Buscar usuario"
+                />
+              </label>
+            </div>
             {users.length === 0 ? (
               <p>No hay usuarios registrados.</p>
+            ) : filteredUsers.length === 0 ? (
+              <p className="sac-admin-empty">No hay usuarios que coincidan con la búsqueda.</p>
             ) : (
               <div className="sac-admin-list">
-                {users.map((item) => (
+                {filteredUsers.map((item) => (
                   <div className="sac-admin-row" key={item.id_usuario}>
                     <div>
                       <strong>{item.nombre} {item.apellido}</strong>
-                      <span>{item.email}</span>
+                      <span>{item.email}{item.fecha_registro ? ` · Registrado el ${new Date(item.fecha_registro).toLocaleDateString("es-AR")}` : ""}</span>
                     </div>
                     <label className="sac-admin-control">
                       <span>Rol</span>
                       <select
                         className="sac-select"
                         value={item.rol}
-                        disabled={savingAction === `user-${item.id_usuario}` || item.id_usuario === user?.id_usuario}
+                        disabled={savingAction === `user-${item.id_usuario}`}
                         onChange={(event) => updateUserRole(item.id_usuario, event.target.value)}
                       >
                         <option value="vecino">Vecino</option>
@@ -559,16 +704,49 @@ function AdminScreen({ navigateTo, user, onLogout }) {
           </section>
 
           <section className="sac-admin-section">
-            <h2>Reportes</h2>
+            <div className="sac-admin-section-header">
+              <div>
+                <h2>Reportes</h2>
+                <p>Revisá las solicitudes y actualizá su estado.</p>
+              </div>
+              <div className="sac-admin-report-tools">
+                <label className="sac-admin-search">
+                  <Icon type="file" size={17} />
+                  <input
+                    type="search"
+                    placeholder="Buscar reporte..."
+                    value={reportSearch}
+                    onChange={(event) => setReportSearch(event.target.value)}
+                    aria-label="Buscar reporte"
+                  />
+                </label>
+                <select
+                  className="sac-admin-filter"
+                  value={reportFilter}
+                  onChange={(event) => setReportFilter(event.target.value)}
+                  aria-label="Filtrar reportes por estado"
+                >
+                  <option value="todos">Todos los estados</option>
+                  <option value="pendiente">Pendientes</option>
+                  <option value="proceso">En proceso</option>
+                  <option value="resuelto">Resueltos</option>
+                </select>
+              </div>
+            </div>
             {reports.length === 0 ? (
               <p>No hay reportes para gestionar.</p>
+            ) : filteredReports.length === 0 ? (
+              <p className="sac-admin-empty">No hay reportes que coincidan con los filtros.</p>
             ) : (
               <div className="sac-admin-list">
-                {reports.map((report) => (
+                {filteredReports.map((report) => (
                   <div className="sac-admin-row" key={report.id_reporte}>
                     <div>
                       <strong>{report.titulo}</strong>
-                      <span>{report.direccion} · {report.vecino}</span>
+                      <span>{report.direccion} · {report.categoria || "Sin categoría"} · {report.vecino || "Vecino"}</span>
+                      {report.fecha_reporte && (
+                        <span>Recibido el {new Date(report.fecha_reporte).toLocaleDateString("es-AR")}</span>
+                      )}
                     </div>
                     <label className="sac-admin-control">
                       <span>Estado</span>
@@ -583,6 +761,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
                           <option key={item.id_estado} value={item.id_estado}>{item.nombre}</option>
                         ))}
                       </select>
+                      {savingAction === `report-${report.id_reporte}` && <span role="status">Guardando cambio...</span>}
                     </label>
                   </div>
                 ))}
@@ -964,6 +1143,14 @@ export default function App() {
     setLoginForm({ email: "", password: "" });
   };
 
+  const handleUserUpdated = (updatedUser) => {
+    setUser(updatedUser);
+    localStorage.setItem("sac_user", JSON.stringify(updatedUser));
+    if (updatedUser.rol !== "administrador") {
+      setScreen("home");
+    }
+  };
+
   useEffect(() => {
     if (!localStorage.getItem("sac_token")) return;
 
@@ -1019,8 +1206,11 @@ export default function App() {
   if (screen === "home") {
     return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   }
+  if (screen === "guia") {
+    return <GuideScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
   if (screen === "admin" && user?.rol === "administrador") {
-    return <AdminScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+    return <AdminScreen navigateTo={setScreen} user={user} onLogout={handleLogout} onUserUpdated={handleUserUpdated} />;
   }
   if (screen === "reportar-form") {
     return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
