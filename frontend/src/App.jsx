@@ -1516,7 +1516,7 @@ function ReportDetail({ navigateTo, user, onLogout }) {
             vehículos. Ya ha causado varios inconvenientes.
           </p>
         </div>
-
+   
         {/* Botón Acción Principal */}
         <button 
           className={`sac-support-button ${hasLiked ? "supported" : ""}`}

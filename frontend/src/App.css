@@ -74,7 +74,7 @@ button {
   margin: auto;
   display: flex;
   justify-content: center;
-  margin-top: 50px;
+  margin-top: 50px;       
   width: 50%;
 }
 
@@ -84,6 +84,13 @@ button {
   margin-right: auto;
   width: 400px;
   height: 150px;
+}
+
+.logo-container img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 .presentation h1 {
@@ -346,6 +353,8 @@ button {
 /* ==========================================================================
    ESTILOS PARA PANTALLAS INTERNAS (3 AL 8)
    ========================================================================== */
+
+   
 
 .sac-app-container {
   position: relative;
