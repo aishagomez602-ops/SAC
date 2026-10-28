@@ -38,26 +38,6 @@ async function apiFetch(endpoint, options = {}) {
   }
 
   return data;
-} 
-
-function getReportCoordinates(report) {
-  if (
-    report?.latitud === null || report?.latitud === undefined || report.latitud === "" ||
-    report?.longitud === null || report?.longitud === undefined || report.longitud === ""
-  ) {
-    return null;
-  }
-
-  const latitude = Number(report.latitud);
-  const longitude = Number(report.longitud);
-  if (
-    !Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
-    !Number.isFinite(longitude) || longitude < -180 || longitude > 180
-  ) {
-    return null;
-  }
-
-  return { latitude, longitude };
 }
 
 const Icon = ({ type, size = 22 }) => {
@@ -131,10 +111,7 @@ function Logo() {
 }
 
 function CityIllustration() {
-  return (
-   <p>ciudad</p>
-
-  );
+  return <p>ciudad</p>;
 }
 
 function Field({ icon, type = "text", placeholder, name, value, onChange, autoComplete }) {
@@ -167,18 +144,8 @@ function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorM
       <main className="layout login-layout">
         <section className="presentation">
           <Logo />
-
-          <h1>
-            Un barrio mejor<br />
-            también depende<br />
-            <strong>de VOS</strong>
-          </h1>
-
-          <p>
-            Reportá problemas, y ayudá a un barrio<br />
-            más ordenado y cuidado más lindo para todos.
-          </p>
-
+          <h1>Un barrio mejor<br />también depende<br /><strong>de VOS</strong></h1>
+          <p>Reportá problemas, y ayudá a un barrio<br />más ordenado y cuidado más lindo para todos.</p>
           <CityIllustration />
         </section>
 
@@ -186,29 +153,9 @@ function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorM
           <h2>Iniciar sesión</h2>
           <p className="card-description">Ingresá a tu cuenta para continuar</p>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              goHome();
-            }}
-          >
-            <Field
-              icon="mail"
-              name="email"
-              placeholder="Correo electrónico"
-              value={loginForm.email}
-              onChange={handleChange}
-              autoComplete="email"
-            />
-            <Field
-              icon="lock"
-              type="password"
-              name="password"
-              placeholder="Contraseña"
-              value={loginForm.password}
-              onChange={handleChange}
-              autoComplete="current-password"
-            />
+          <form onSubmit={(e) => { e.preventDefault(); goHome(); }}>
+            <Field icon="mail" name="email" placeholder="Correo electrónico" value={loginForm.email} onChange={handleChange} autoComplete="email" />
+            <Field icon="lock" type="password" name="password" placeholder="Contraseña" value={loginForm.password} onChange={handleChange} autoComplete="current-password" />
 
             <div className="form-options">
               <label className="remember">
@@ -227,7 +174,7 @@ function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorM
 
           <div className="divider"><span>o</span></div>
 
-          <button className="secondary-button" onClick={goRegister}>
+          <button className="secondary-button" onClick={goRegister} type="button">
             Crear una cuenta
           </button>
         </section>
@@ -252,13 +199,7 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
       <main className="layout register-layout">
         <section className="presentation register-presentation">
           <Logo />
-
-          <h1 className="register-title">
-            Juntos<br />
-            hacemos un<br />
-            barrio mejor
-          </h1>
-
+          <h1 className="register-title">Juntos<br />hacemos un<br />barrio mejor</h1>
           <CityIllustration />
         </section>
 
@@ -266,13 +207,8 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
           <h2>Crear cuenta</h2>
           <p className="card-description">Completá tus datos para unirte a la comunidad</p>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              onSubmit();
-            }}
-          >
-            <Field icon="lock" name="DNI " type="DNI" placeholder="DNI" value={registerForm.DNI} onChange={handleChange} autoComplete="DNI" />
+          <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+            <Field icon="lock" name="DNI" type="text" placeholder="DNI" value={registerForm.DNI} onChange={handleChange} autoComplete="off" />
             <Field icon="user" name="nombre" placeholder="Nombre" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" />
             <Field icon="user" name="apellido" placeholder="Apellido" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" />
             <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" />
@@ -286,7 +222,7 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
             </button>
           </form>
 
-          <button className="login-link" onClick={goLogin}>
+          <button className="login-link" onClick={goLogin} type="button">
             ¿Ya tenés una cuenta? Iniciar sesión
           </button>
         </section>
@@ -297,21 +233,16 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
   );
 }
 
-/* ==========================================================================
-   NUEVAS PANTALLAS (S.A.C. 3, 4 y 5)
-   ========================================================================== */
-
 function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogout }) {
   const nombreUsuario = user?.nombre
     ? `${user.nombre} ${user.apellido || ""}`.trim()
-    : "Usuario";
+    : "Aisha Gomez";
 
   return (
     <div className="sac-app-container">
-      {/* Top Navbar */}
       <header className="sac-navbar">
         <div className="sac-logo-area">
-          <img src="/images%20copy/logo%20sin%20descripcion.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
+          <img src="/images/fabicon,fondo.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
           <div className="sac-brand-titles">
             <span className="sac-brand-main">S.A.C</span>
             <span className="sac-brand-sub">Sistema de Atención Ciudadana</span>
@@ -330,7 +261,6 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
       </header>
 
       <div className="sac-body-layout">
-        {/* Sidebar Left Navigation */}
         <aside className="sac-sidebar">
           <nav className="sac-nav-menu">
             <button
@@ -349,32 +279,33 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               <span className="sac-nav-icon"><Icon type="file" size={19} /></span>
               <span>Reportes</span>
             </button>
-            <button type="button" className="sac-nav-item" onClick={() => navigateTo("mapa")}>
+            <button 
+              type="button" 
+              className={`sac-nav-item ${activeNav === "mapa" ? "active" : ""}`}
+              onClick={() => navigateTo("mapa")}
+            >
               <span className="sac-nav-icon"><Icon type="map" size={19} /></span>
               <span>Mapa</span>
             </button>
-            <button type="button" className="sac-nav-item" onClick={() => navigateTo("notificaciones")}>
+            <button 
+              type="button" 
+              className={`sac-nav-item ${activeNav === "notificaciones" ? "active" : ""}`}
+              onClick={() => navigateTo("notificaciones")}
+            >
               <span className="sac-nav-icon"><Icon type="bell" size={19} /></span>
               <span>Notificaciones</span>
             </button>
-            <button type="button" className="sac-nav-item" onClick={() => navigateTo("perfil")}>
+            <button 
+              type="button" 
+              className={`sac-nav-item ${activeNav === "perfil" ? "active" : ""}`}
+              onClick={() => navigateTo("perfil")}
+            >
               <span className="sac-nav-icon"><Icon type="user" size={19} /></span>
               <span>Perfil</span>
             </button>
-            {user?.rol === "administrador" && (
-              <button
-                type="button"
-                className={`sac-nav-item ${activeNav === "admin" ? "active" : ""}`}
-                onClick={() => navigateTo("admin")}
-              >
-                <span className="sac-nav-icon"><Icon type="clipboard" size={19} /></span>
-                <span>Administración</span>
-              </button>
-            )}
           </nav>
         </aside>
 
-        {/* Main Workspace Area */}
         <main className="sac-content-area">
           {children}
         </main>
@@ -387,7 +318,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
 
 /* Pantalla 3: Dashboard Principal */
 function Dashboard({ navigateTo, user, onLogout }) {
-  const nombre = user?.nombre || "Usuario";
+  const nombre = user?.nombre || "Aisha";
 
   return (
     <AppLayout activeNav="home" navigateTo={navigateTo} screenNumber="3" user={user} onLogout={onLogout}>
@@ -403,7 +334,6 @@ function Dashboard({ navigateTo, user, onLogout }) {
         </div>
       </div>
 
-      {/* Banner Principal Reportar */}
       <div
         className="sac-hero-report-banner"
         onClick={() => navigateTo("reportar-form")}
@@ -418,7 +348,6 @@ function Dashboard({ navigateTo, user, onLogout }) {
         <div className="sac-hero-arrow">➔</div>
       </div>
 
-      {/* Tarjetas de Accesos Rápidos */}
       <div className="sac-dashboard-grid">
         <div className="sac-dash-card" onClick={() => navigateTo("mis-reportes")}>
           <div className="sac-dash-card-icon orange-bg"><Icon type="clipboard" size={21} /></div>
@@ -432,569 +361,76 @@ function Dashboard({ navigateTo, user, onLogout }) {
           <p>Conocé los problemas más comunes</p>
         </div>
 
-        <button className="sac-dash-card" type="button" onClick={() => navigateTo("guia")}>
+        <div className="sac-dash-card" onClick={() => navigateTo("guia-uso")}>
           <div className="sac-dash-card-icon orange-bg"><Icon type="book" size={21} /></div>
           <h3>Guía de uso</h3>
           <p>Aprendé a usar el sistema</p>
-        </button>
-      </div>
-    </AppLayout>
-  );
-}
-
-function GuideScreen({ navigateTo, user, onLogout }) {
-  const guideSteps = [
-    {
-      number: "01",
-      icon: "megaphone",
-      title: "Reportá un problema",
-      description: "Elegí la categoría, indicá la dirección y contá qué sucede. Si podés, agregá una foto y la ubicación para ayudar a identificarlo.",
-      action: "Crear un reporte",
-      target: "reportar-form"
-    },
-    {
-      number: "02",
-      icon: "clipboard",
-      title: "Seguí tus reportes",
-      description: "En “Mis reportes” podés consultar el estado de cada solicitud y revisar las novedades a medida que se actualiza.",
-      action: "Ver mis reportes",
-      target: "mis-reportes"
-    },
-    {
-      number: "03",
-      icon: "map",
-      title: "Explorá el mapa",
-      description: "Consultá los problemas informados en el barrio y abrí la ubicación de cada reporte para orientarte.",
-      action: "Abrir el mapa",
-      target: "mapa"
-    },
-    {
-      number: "04",
-      icon: "bell",
-      title: "Revisá tus notificaciones",
-      description: "Encontrá avisos sobre los cambios de estado y otras novedades relacionadas con tus reportes.",
-      action: "Ver notificaciones",
-      target: "notificaciones"
-    }
-  ];
-
-  return (
-    <AppLayout activeNav="guia" navigateTo={navigateTo} screenNumber="10" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Guía de uso</h1>
-      <p className="sac-page-subtitle">Todo lo que necesitás para participar y mejorar tu barrio</p>
-
-      <div className="sac-guide-intro">
-        <div className="sac-guide-intro-icon"><Icon type="book" size={25} /></div>
-        <div>
-          <h2>¿Cómo funciona S.A.C.?</h2>
-          <p>Usá estos pasos para informar problemas y seguir su resolución.</p>
         </div>
       </div>
-
-      <div className="sac-guide-grid">
-        {guideSteps.map((step) => (
-          <article className="sac-guide-card" key={step.number}>
-            <div className="sac-guide-card-heading">
-              <span className="sac-guide-number">{step.number}</span>
-              <span className="sac-guide-icon"><Icon type={step.icon} size={20} /></span>
-            </div>
-            <h2>{step.title}</h2>
-            <p>{step.description}</p>
-            <button className="sac-guide-action" type="button" onClick={() => navigateTo(step.target)}>
-              {step.action} <span aria-hidden="true">→</span>
-            </button>
-          </article>
-        ))}
-      </div>
-    </AppLayout>
-  );
-}
-
-function AdminScreen({ navigateTo, user, onLogout, onUserUpdated }) {
-  const [users, setUsers] = useState([]);
-  const [reports, setReports] = useState([]);
-  const [states, setStates] = useState([]);
-  const [userSearch, setUserSearch] = useState("");
-  const [reportSearch, setReportSearch] = useState("");
-  const [reportFilter, setReportFilter] = useState("todos");
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [savingAction, setSavingAction] = useState("");
-
-  useEffect(() => {
-    async function loadAdminData() {
-      try {
-        const [usersData, reportsData, statesData] = await Promise.all([
-          apiFetch("/admin/usuarios"),
-          apiFetch("/reportes/todos"),
-          apiFetch("/admin/estados")
-        ]);
-
-        setUsers(usersData.usuarios || []);
-        setReports(reportsData.reportes || []);
-        setStates(statesData.estados || []);
-      } catch (error) {
-        setErrorMessage(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadAdminData();
-  }, []);
-
-  const updateUserRole = async (idUsuario, rol) => {
-    setSavingAction(`user-${idUsuario}`);
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    try {
-      const data = await apiFetch(`/admin/usuarios/${idUsuario}/rol`, {
-        method: "PUT",
-        body: JSON.stringify({ rol })
-      });
-      setUsers((currentUsers) => currentUsers.map((item) => (
-        item.id_usuario === idUsuario ? { ...item, rol } : item
-      )));
-      if (String(idUsuario) === String(user?.id_usuario)) {
-        onUserUpdated({ ...user, rol });
-      }
-      setSuccessMessage(data.mensaje);
-    } catch (error) {
-      setErrorMessage(error.message);
-    } finally {
-      setSavingAction("");
-    }
-  };
-
-  const updateReportState = async (idReporte, idEstado) => {
-    setSavingAction(`report-${idReporte}`);
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    try {
-      const data = await apiFetch(`/admin/reportes/${idReporte}/estado`, {
-        method: "PUT",
-        body: JSON.stringify({ id_estado: idEstado })
-      });
-      const newState = states.find((item) => item.id_estado === Number(idEstado));
-      setReports((currentReports) => currentReports.map((item) => (
-        item.id_reporte === idReporte ? { ...item, estado: newState?.nombre || item.estado } : item
-      )));
-      setSuccessMessage(data.mensaje);
-    } catch (error) {
-      setErrorMessage(error.message);
-    } finally {
-      setSavingAction("");
-    }
-  };
-
-  const filteredUsers = users.filter((item) => (
-    `${item.nombre} ${item.apellido} ${item.email}`.toLowerCase().includes(userSearch.trim().toLowerCase())
-  ));
-
-  const filteredReports = reports.filter((report) => {
-    const searchText = `${report.titulo} ${report.direccion} ${report.vecino} ${report.categoria}`.toLowerCase();
-    const matchesSearch = searchText.includes(reportSearch.trim().toLowerCase());
-    const normalizedStatus = (report.estado || "").toLowerCase();
-    const matchesStatus = reportFilter === "todos" ||
-      (reportFilter === "pendiente" && normalizedStatus.includes("pendiente")) ||
-      (reportFilter === "proceso" && normalizedStatus.includes("proceso")) ||
-      (reportFilter === "resuelto" && normalizedStatus.includes("resuelt"));
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const countReportsByStatus = (status) => reports.filter((report) => (
-    (report.estado || "").toLowerCase().includes(status)
-  )).length;
-
-  return (
-    <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
-      <div className="sac-admin-header">
-        <div>
-          <span className="sac-admin-eyebrow">PANEL DE CONTROL</span>
-          <h1 className="sac-page-title">Administración</h1>
-          <p className="sac-page-subtitle">Gestioná usuarios, roles y reportes del sistema</p>
-        </div>
-        <span className="sac-admin-role"><Icon type="clipboard" size={16} /> Administrador</span>
-      </div>
-
-      {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
-      {successMessage && <p className="success-message" role="status">{successMessage}</p>}
-
-      {loading ? (
-        <p>Cargando información de administración...</p>
-      ) : (
-        <>
-          <section className="sac-admin-stats" aria-label="Resumen del sistema">
-            <article className="sac-admin-stat">
-              <span>Usuarios registrados</span>
-              <strong>{users.length}</strong>
-              <small>Cuentas en el sistema</small>
-            </article>
-            <article className="sac-admin-stat">
-              <span>Reportes recibidos</span>
-              <strong>{reports.length}</strong>
-              <small>Solicitudes ciudadanas</small>
-            </article>
-            <article className="sac-admin-stat">
-              <span>Pendientes</span>
-              <strong>{countReportsByStatus("pendiente")}</strong>
-              <small>Requieren seguimiento</small>
-            </article>
-            <article className="sac-admin-stat">
-              <span>En proceso</span>
-              <strong>{countReportsByStatus("proceso")}</strong>
-              <small>En gestión</small>
-            </article>
-            <article className="sac-admin-stat">
-              <span>Resueltos</span>
-              <strong>{countReportsByStatus("resuelt")}</strong>
-              <small>Casos finalizados</small>
-            </article>
-          </section>
-
-          <section className="sac-admin-section">
-            <div className="sac-admin-section-header">
-              <div>
-                <h2>Usuarios y roles</h2>
-                <p>Administrá los permisos de acceso de cada cuenta.</p>
-              </div>
-              <label className="sac-admin-search">
-                <Icon type="user" size={17} />
-                <input
-                  type="search"
-                  placeholder="Buscar usuario..."
-                  value={userSearch}
-                  onChange={(event) => setUserSearch(event.target.value)}
-                  aria-label="Buscar usuario"
-                />
-              </label>
-            </div>
-            {users.length === 0 ? (
-              <p>No hay usuarios registrados.</p>
-            ) : filteredUsers.length === 0 ? (
-              <p className="sac-admin-empty">No hay usuarios que coincidan con la búsqueda.</p>
-            ) : (
-              <div className="sac-admin-list">
-                {filteredUsers.map((item) => (
-                  <div className="sac-admin-row" key={item.id_usuario}>
-                    <div>
-                      <strong>{item.nombre} {item.apellido}</strong>
-                      <span>{item.email}{item.fecha_registro ? ` · Registrado el ${new Date(item.fecha_registro).toLocaleDateString("es-AR")}` : ""}</span>
-                    </div>
-                    <label className="sac-admin-control">
-                      <span>Rol</span>
-                      <select
-                        className="sac-select"
-                        value={item.rol}
-                        disabled={savingAction === `user-${item.id_usuario}`}
-                        onChange={(event) => updateUserRole(item.id_usuario, event.target.value)}
-                      >
-                        <option value="vecino">Vecino</option>
-                        <option value="administrador">Administrador</option>
-                      </select>
-                    </label>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="sac-admin-section">
-            <div className="sac-admin-section-header">
-              <div>
-                <h2>Reportes</h2>
-                <p>Revisá las solicitudes y actualizá su estado.</p>
-              </div>
-              <div className="sac-admin-report-tools">
-                <label className="sac-admin-search">
-                  <Icon type="file" size={17} />
-                  <input
-                    type="search"
-                    placeholder="Buscar reporte..."
-                    value={reportSearch}
-                    onChange={(event) => setReportSearch(event.target.value)}
-                    aria-label="Buscar reporte"
-                  />
-                </label>
-                <select
-                  className="sac-admin-filter"
-                  value={reportFilter}
-                  onChange={(event) => setReportFilter(event.target.value)}
-                  aria-label="Filtrar reportes por estado"
-                >
-                  <option value="todos">Todos los estados</option>
-                  <option value="pendiente">Pendientes</option>
-                  <option value="proceso">En proceso</option>
-                  <option value="resuelto">Resueltos</option>
-                </select>
-              </div>
-            </div>
-            {reports.length === 0 ? (
-              <p>No hay reportes para gestionar.</p>
-            ) : filteredReports.length === 0 ? (
-              <p className="sac-admin-empty">No hay reportes que coincidan con los filtros.</p>
-            ) : (
-              <div className="sac-admin-list">
-                {filteredReports.map((report) => (
-                  <div className="sac-admin-row" key={report.id_reporte}>
-                    <div>
-                      <strong>{report.titulo}</strong>
-                      <span>{report.direccion} · {report.categoria || "Sin categoría"} · {report.vecino || "Vecino"}</span>
-                      {report.fecha_reporte && (
-                        <span>Recibido el {new Date(report.fecha_reporte).toLocaleDateString("es-AR")}</span>
-                      )}
-                    </div>
-                    <label className="sac-admin-control">
-                      <span>Estado</span>
-                      <select
-                        className="sac-select"
-                        value={states.find((item) => item.nombre === report.estado)?.id_estado || ""}
-                        disabled={savingAction === `report-${report.id_reporte}`}
-                        onChange={(event) => updateReportState(report.id_reporte, event.target.value)}
-                      >
-                        <option value="" disabled>Seleccioná un estado</option>
-                        {states.map((item) => (
-                          <option key={item.id_estado} value={item.id_estado}>{item.nombre}</option>
-                        ))}
-                      </select>
-                      {savingAction === `report-${report.id_reporte}` && <span role="status">Guardando cambio...</span>}
-                    </label>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
-      )}
     </AppLayout>
   );
 }
 
 /* Pantalla 4: Formulario de Reporte */
 function ReportForm({ navigateTo, user, onLogout }) {
-  const [categories, setCategories] = useState([]);
-  const [categoryError, setCategoryError] = useState("");
-  const [formError, setFormError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [locating, setLocating] = useState(false);
-  const [description, setDescription] = useState("");
-  const [photo, setPhoto] = useState(null);
-  const [location, setLocation] = useState(null);
-
-  useEffect(() => {
-    async function cargarCategorias() {
-      try {
-        const data = await apiFetch("/categorias");
-        setCategories(data.categorias || []);
-      } catch (error) {
-        setCategoryError(error.message);
-      }
-    }
-
-    cargarCategorias();
-  }, []);
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setFormError("");
-
-    if (!location) {
-      setFormError("Indicá la ubicación del problema antes de enviar el reporte.");
-      return;
-    }
-
-    setSubmitting(true);
-
-    const formData = new FormData(event.currentTarget);
-    const selectedCategory = categories.find(
-      (category) => String(category.id_categoria) === formData.get("id_categoria")
-    );
-
-    if (!selectedCategory) {
-      setFormError("Elegí una categoría válida para el reporte.");
-      setSubmitting(false);
-      return;
-    }
-
-    formData.set("titulo", selectedCategory.nombre);
-    formData.set("latitud", String(location.latitude));
-    formData.set("longitud", String(location.longitude));
-    if (photo) formData.set("foto", photo);
-
-    try {
-      await apiFetch("/reportes/crear", {
-        method: "POST",
-        body: formData
-      });
-      navigateTo("mis-reportes");
-    } catch (error) {
-      setFormError(error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleGetLocation = () => {
-    setFormError("");
-
-    if (!navigator.geolocation) {
-      setFormError("Este navegador no permite obtener la ubicación. Probá con otro navegador.");
-      return;
-    }
-
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        setLocation({ latitude: coords.latitude, longitude: coords.longitude });
-        setLocating(false);
-      },
-      (error) => {
-        const messages = {
-          1: "No se otorgó permiso para acceder a la ubicación.",
-          2: "No se pudo determinar la ubicación. Intentá nuevamente.",
-          3: "Se agotó el tiempo para obtener la ubicación. Intentá nuevamente."
-        };
-        setFormError(messages[error.code] || "No se pudo obtener la ubicación.");
-        setLocating(false);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  };
-
-  const handlePhotoChange = (event) => {
-    const selectedPhoto = event.currentTarget.files?.[0] || null;
-    setFormError("");
-
-    if (selectedPhoto && selectedPhoto.size > 5 * 1024 * 1024) {
-      event.currentTarget.value = "";
-      setPhoto(null);
-      setFormError("La foto no puede superar los 5 MB.");
-      return;
-    }
-
-    if (selectedPhoto && !selectedPhoto.type.startsWith("image/")) {
-      event.currentTarget.value = "";
-      setPhoto(null);
-      setFormError("El archivo seleccionado no es una imagen válida.");
-      return;
-    }
-
-    setPhoto(selectedPhoto);
-  };
-
   return (
     <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Reportar un problema</h1>
       <p className="sac-page-subtitle">Completá la información para enviar tu reporte</p>
 
       <div className="sac-report-layout">
-        {/* Formulario Principal */}
-        <form className="sac-form-container" onSubmit={handleSubmit}>
+        <div className="sac-form-container">
           <div className="sac-form-group">
-            <label className="sac-label" htmlFor="report-category">Categoría</label>
+            <label className="sac-label">Categoría</label>
             <div className="sac-select-wrapper">
-              <select className="sac-select" id="report-category" name="id_categoria" defaultValue="" required>
+              <select className="sac-select" defaultValue="">
                 <option value="" disabled>Elegí el tipo de problema</option>
-                {categories.map((category) => (
-                  <option key={category.id_categoria} value={category.id_categoria}>{category.nombre}</option>
-                ))}
+                <option value="calles">Calles y veredas</option>
+                <option value="alumbrado">Alumbrado</option>
+                <option value="basura">Basura</option>
+                <option value="agua">Agua</option>
+                <option value="espacios">Espacios verdes</option>
+                <option value="transito">Tránsito</option>
+                <option value="senalizacion">Señalización</option>
+                <option value="otro">Otro</option>
               </select>
             </div>
-            {categoryError && <p className="error-message" role="alert">No se pudieron cargar las categorías: {categoryError}</p>}
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label" htmlFor="report-address">Dirección</label>
-            <input
-              className="sac-input"
-              id="report-address"
-              name="direccion"
-              type="text"
-              placeholder="Calle y altura o esquina"
-              maxLength={255}
-              required
-            />
-          </div>
-
-          <div className="sac-form-group">
-            <span className="sac-label">Ubicación en el mapa</span>
-            <button
-              className="sac-location-btn"
-              type="button"
-              onClick={handleGetLocation}
-              disabled={locating || submitting}
-            >
-              <Icon type="pin" size={17} />
-              {locating ? "Obteniendo ubicación..." : location ? "Actualizar ubicación" : "Usar mi ubicación actual"}
-            </button>
-            <p className="sac-location-description">
-              Permití el acceso a tu ubicación para señalar dónde está el problema.
-            </p>
-            {location && (
-              <p className="sac-location-coordinates" role="status">
-                Ubicación registrada: {location.latitude.toFixed(5)}, {location.longitude.toFixed(5)}
-              </p>
-            )}
-          </div>
-
-          <div className="sac-form-group">
-            <label className="sac-label" htmlFor="report-description">Descripción</label>
+            <label className="sac-label">Descripción</label>
             <div className="sac-textarea-wrapper">
-              <textarea
-                className="sac-textarea"
-                id="report-description"
-                name="descripcion"
-                placeholder="Contanos qué sucede..."
-                maxLength={500}
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                required
-              />
-              <span className="sac-char-count">{description.length}/500</span>
+              <textarea className="sac-textarea" placeholder="Contanos qué sucede..." maxLength={500}></textarea>
+              <span className="sac-char-count">0/500</span>
             </div>
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label" htmlFor="report-photo">Agregar una foto (opcional)</label>
-            <label className="sac-upload-box" htmlFor="report-photo">
-              <div className="sac-camera-icon"><Icon type="camera" size={23} /></div>
-              <p>
-                {photo ? (
-                  <><strong>{photo.name}</strong><br />Seleccioná para cambiar la foto</>
-                ) : (
-                  <>Seleccioná una imagen<br />(5 MB máximo)</>
-                )}
-              </p>
-            </label>
-            <input
-              className="sac-file-input"
-              id="report-photo"
-              type="file"
-              accept="image/*"
-              onChange={handlePhotoChange}
-            />
+            <label className="sac-label">Agregar una foto (opcional)</label>
+            <div className="sac-upload-box">
+              <div className="sac-camera-icon">📷</div>
+              <p>Seleccioná una imagen<br />o arrastrala aquí</p>
+            </div>
           </div>
 
-          {formError && <p className="error-message" role="alert">{formError}</p>}
-          <button className="sac-primary-btn" type="submit" disabled={submitting || categories.length === 0}>
-            {submitting ? "Enviando..." : "Enviar reporte"}
+          <button className="sac-primary-btn" onClick={() => navigateTo("mis-reportes")} type="button">
+            Enviar reporte
           </button>
-        </form>
+        </div>
 
-        {/* Menú Lateral de Categorías */}
         <div className="sac-categories-sidebar">
           <h3>Categorías</h3>
           <ul className="sac-categories-list">
-            {categories.map((category) => (
-              <li key={category.id_categoria}>{category.nombre}</li>
-            ))}
+            <li><span className="cat-icon">🚧</span> Calles y veredas</li>
+            <li><span className="cat-icon">💡</span> Alumbrado</li>
+            <li><span className="cat-icon">🗑️</span> Basura</li>
+            <li><span className="cat-icon">🚰</span> Agua</li>
+            <li><span className="cat-icon">🌱</span> Espacios verdes</li>
+            <li><span className="cat-icon">🚗</span> Tránsito</li>
+            <li><span className="cat-icon">⚠️</span> Señalización</li>
+            <li><span className="cat-icon">🔧</span> Otro</li>
           </ul>
-
-          <div className="sac-plant-decoration"><Icon type="leaf" size={26} /></div>
+          <div className="sac-plant-decoration">🪴</div>
         </div>
       </div>
     </AppLayout>
@@ -1004,33 +440,12 @@ function ReportForm({ navigateTo, user, onLogout }) {
 /* Pantalla 5: Lista de Mis Reportes */
 function MyReports({ navigateTo, user, onLogout }) {
   const [filter, setFilter] = useState("todos");
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    async function cargarReportes() {
-      try {
-        const data = await apiFetch("/reportes/mis-reportes");
-        setReports(data.reportes || []);
-      } catch (error) {
-        setErrorMessage(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    cargarReportes();
-  }, []);
-
-  const filteredReports = reports.filter((reporte) => {
-    if (filter === "todos") return true;
-    const estado = (reporte.estado || "").toLowerCase();
-    if (filter === "pendientes") return estado === "pendiente";
-    if (filter === "en-proceso") return estado === "en proceso";
-    if (filter === "resueltos") return estado === "resuelto";
-    return true;
-  });
+  const reports = [
+    { id: 1, title: "Bache en la calle", location: "Calle 12 y 5", date: "08/09/2026", status: "En proceso", statusClass: "status-in-process" },
+    { id: 2, title: "Basura en la vereda", location: "Calle 12 y 5", date: "08/09/2026", status: "Pendiente", statusClass: "status-pending" },
+    { id: 3, title: "Falta de alumbrado", location: "Calle 12 y 5", date: "08/09/2026", status: "Resuelto", statusClass: "status-resolved" },
+  ];
 
   return (
     <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" user={user} onLogout={onLogout}>
@@ -1038,429 +453,68 @@ function MyReports({ navigateTo, user, onLogout }) {
       <p className="sac-page-subtitle">Acá podés ver el estado de todos tus reportes</p>
 
       <div className="sac-filter-tabs">
-        <button className={`sac-tab ${filter === "todos" ? "active" : ""}`} onClick={() => setFilter("todos")}>Todos</button>
-        <button className={`sac-tab ${filter === "pendientes" ? "active" : ""}`} onClick={() => setFilter("pendientes")}>Pendientes</button>
-        <button className={`sac-tab ${filter === "en-proceso" ? "active" : ""}`} onClick={() => setFilter("en-proceso")}>En proceso</button>
-        <button className={`sac-tab ${filter === "resueltos" ? "active" : ""}`} onClick={() => setFilter("resueltos")}>Resueltos</button>
+        <button type="button" className={`sac-tab ${filter === "todos" ? "active" : ""}`} onClick={() => setFilter("todos")}>Todos</button>
+        <button type="button" className={`sac-tab ${filter === "pendientes" ? "active" : ""}`} onClick={() => setFilter("pendientes")}>Pendientes</button>
+        <button type="button" className={`sac-tab ${filter === "en-proceso" ? "active" : ""}`} onClick={() => setFilter("en-proceso")}>En proceso</button>
+        <button type="button" className={`sac-tab ${filter === "resueltos" ? "active" : ""}`} onClick={() => setFilter("resueltos")}>Resueltos</button>
       </div>
 
       <div className="sac-reports-list">
-        {loading ? (
-          <p>Cargando reportes...</p>
-        ) : errorMessage ? (
-          <p className="error-message" role="alert">No se pudieron cargar tus reportes: {errorMessage}</p>
-        ) : filteredReports.length === 0 ? (
-          <p>{reports.length === 0 ? "Todavía no enviaste ningún reporte." : "No tenés reportes en esta categoría."}</p>
-        ) : (
-          filteredReports.map((item) => (
-            <div className="sac-report-card" key={item.id_reporte}>
-              <div className="sac-report-thumb">{item.foto ? "IMG" : "FOTO"}</div>
-              <div className="sac-report-info">
-                <h3>{item.titulo}</h3>
-                <p>{item.direccion} • {new Date(item.fecha_reporte).toLocaleDateString("es-AR")}</p>
-              </div>
-              <div className={`sac-status-badge ${(item.estado || "pendiente").toLowerCase().replace(/\s+/g, "-")}`}>
-                {item.estado || "Pendiente"}
-              </div>
+        {reports.map((item) => (
+          <div className="sac-report-card clickable" key={item.id} onClick={() => navigateTo("detalle-reporte")}>
+            <div className="sac-report-thumb">FOTO</div>
+            <div className="sac-report-info">
+              <h3>{item.title}</h3>
+              <p>{item.location} • {item.date}</p>
             </div>
-          ))
-        )}
+            <div className={`sac-status-badge ${item.statusClass}`}>{item.status}</div>
+          </div>
+        ))}
       </div>
     </AppLayout>
   );
 }
 
-/* Componente Principal Manejador de Vistas */
-export default function App() {
-  const [screen, setScreen] = useState(() => {
-    const storedToken = localStorage.getItem("sac_token");
-    return storedToken ? "home" : "login";
-  });
-  const [user, setUser] = useState(() => getStoredUser());
-  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
-  const [registerForm, setRegisterForm] = useState({ nombre: "", apellido: "", email: "", contrasena: "" });
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const handleLogin = async () => {
-    setSubmitting(true);
-    setErrorMessage("");
-
-    try {
-      const data = await apiFetch("/auth/login", {
-        method: "POST",
-        body: JSON.stringify({
-          email: loginForm.email,
-          contrasena: loginForm.password
-        })
-      });
-
-      localStorage.setItem("sac_token", data.token);
-      localStorage.setItem("sac_user", JSON.stringify(data.usuario));
-      setUser(data.usuario);
-      setScreen("home");
-    } catch (error) {
-      setErrorMessage(error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleRegister = async () => {
-    setSubmitting(true);
-    setErrorMessage("");
-    setSuccessMessage("");
-
-    try {
-      const data = await apiFetch("/auth/registro", {
-        method: "POST",
-        body: JSON.stringify({
-          nombre: registerForm.nombre,
-          apellido: registerForm.apellido,
-          email: registerForm.email,
-          contrasena: registerForm.contrasena
-        })
-      });
-
-      setSuccessMessage(data.mensaje || "Usuario registrado correctamente");
-      setRegisterForm({ nombre: "", apellido: "", email: "", contrasena: "" });
-      setTimeout(() => {
-        setScreen("login");
-      }, 800);
-    } catch (error) {
-      setErrorMessage(error.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem("sac_token");
-    localStorage.removeItem("sac_user");
-    setUser(null);
-    setScreen("login");
-    setLoginForm({ email: "", password: "" });
-  };
-
-  const handleUserUpdated = (updatedUser) => {
-    setUser(updatedUser);
-    localStorage.setItem("sac_user", JSON.stringify(updatedUser));
-    if (updatedUser.rol !== "administrador") {
-      setScreen("home");
-    }
-  };
-
-  useEffect(() => {
-    if (!localStorage.getItem("sac_token")) return;
-
-    async function cargarDatosUsuario() {
-      try {
-        const data = await apiFetch("/auth/usuario");
-        setUser(data.usuario);
-        localStorage.setItem("sac_user", JSON.stringify(data.usuario));
-      } catch (error) {
-        console.error(error);
-        handleLogout();
-      }
-    }
-
-    cargarDatosUsuario();
-  }, []);
-
-  if (screen === "login") {
-    return (
-      <Login
-        goRegister={() => {
-          setErrorMessage("");
-          setSuccessMessage("");
-          setScreen("register");
-        }}
-        goHome={handleLogin}
-        loginForm={loginForm}
-        setLoginForm={setLoginForm}
-        submitting={submitting}
-        errorMessage={errorMessage}
-      />
-    );
-  }
-
-  if (screen === "register") {
-    return (
-      <Register
-        goLogin={() => {
-          setErrorMessage("");
-          setSuccessMessage("");
-          setScreen("login");
-        }}
-        registerForm={registerForm}
-        setRegisterForm={setRegisterForm}
-        submitting={submitting}
-        errorMessage={errorMessage}
-        successMessage={successMessage}
-        onSubmit={handleRegister}
-      />
-    );
-  }
-
-  if (screen === "home") {
-    return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "guia") {
-    return <GuideScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "admin" && user?.rol === "administrador") {
-    return <AdminScreen navigateTo={setScreen} user={user} onLogout={handleLogout} onUserUpdated={handleUserUpdated} />;
-  }
-  if (screen === "reportar-form") {
-    return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "mis-reportes") {
-    return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "mapa") {
-    return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "detalle-reporte") {
-    return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "perfil") {
-    return <ProfileScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-  if (screen === "notificaciones") {
-    return <NotificationsScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  }
-
-  return (
-    <Login
-      goRegister={() => {
-        setErrorMessage("");
-        setSuccessMessage("");
-        setScreen("register");
-      }}
-      goHome={handleLogin}
-      loginForm={loginForm}
-      setLoginForm={setLoginForm}
-      submitting={submitting}
-      errorMessage={errorMessage}
-    />
-  );
-}
-
-/* Pantalla: Mapa (S.A.C. - Pantalla 6) */
+/* Pantalla 6: Mapa */
 function MapScreen({ navigateTo, user, onLogout }) {
-  const [reports, setReports] = useState([]);
-  const [selectedReportId, setSelectedReportId] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  useEffect(() => {
-    async function cargarReportes() {
-      try {
-        const data = await apiFetch("/reportes/todos");
-        const loadedReports = data.reportes || [];
-        setReports(loadedReports);
-        const firstReportWithLocation = loadedReports.find((report) => getReportCoordinates(report));
-        setSelectedReportId(firstReportWithLocation?.id_reporte ?? loadedReports[0]?.id_reporte ?? null);
-      } catch (error) {
-        setErrorMessage(error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    cargarReportes();
-  }, []);
-
-  const reportsWithLocation = reports.filter((report) => getReportCoordinates(report));
-  const selectedReport = reports.find((report) => report.id_reporte === selectedReportId) || reportsWithLocation[0] || reports[0];
-  const selectedCoordinates = getReportCoordinates(selectedReport);
-  const googleMapsUrl = selectedCoordinates
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedCoordinates.latitude},${selectedCoordinates.longitude}`)}`
-    : null;
-
-  const getStatusClass = (status) => {
-    const normalizedStatus = (status || "pendiente").toLowerCase();
-    if (normalizedStatus.includes("resuelt")) return "green";
-    if (normalizedStatus.includes("proceso")) return "yellow";
-    return "red";
-  };
-
   return (
     <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
-      <p className="sac-page-subtitle">Seleccioná un reporte para ver su ubicación en Google Maps</p>
+      <p className="sac-page-subtitle">Explorá los reportes de tu zona</p>
+
+      <div className="sac-map-legend">
+        <div className="sac-legend-item"><span className="legend-dot red"></span><span>Pendiente</span></div>
+        <div className="sac-legend-item"><span className="legend-dot yellow"></span><span>En proceso</span></div>
+        <div className="sac-legend-item"><span className="legend-dot green"></span><span>Resuelto</span></div>
+      </div>
 
       <div className="sac-map-canvas">
-        {loading ? (
-          <p className="sac-map-empty">Cargando mapa y ubicaciones...</p>
-        ) : selectedCoordinates ? (
-          <iframe
-            className="sac-google-map"
-            title={`Ubicación del reporte: ${selectedReport.titulo}`}
-            src={`https://maps.google.com/maps?q=${selectedCoordinates.latitude},${selectedCoordinates.longitude}&z=15&output=embed`}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
-        ) : (
-          <p className="sac-map-empty">
-            {reports.length === 0
-              ? "Todavía no hay problemas reportados."
-              : "Este reporte no tiene una ubicación cargada."}
-          </p>
-        )}
+        <div className="sac-map-grid-overlay" />
+        <div className="sac-map-river" />
+        <div className="sac-map-pin red" style={{ top: '25%', left: '44%' }}>📍</div>
+        <div className="sac-map-pin red" style={{ top: '50%', left: '54%' }}>📍</div>
+        <div className="sac-map-pin red" style={{ top: '68%', left: '43%' }}>📍</div>
+        <div className="sac-map-pin yellow" style={{ top: '51%', left: '38%' }}>📍</div>
+        <div className="sac-map-pin yellow" style={{ top: '63%', left: '63%' }}>📍</div>
+        <div className="sac-map-pin yellow" style={{ top: '68%', left: '26%' }}>📍</div>
+        <div className="sac-map-pin green" style={{ top: '46%', left: '23%' }}>📍</div>
+        <div className="sac-map-pin green" style={{ top: '41%', left: '68%' }}>📍</div>
       </div>
 
-      {loading ? (
-        <p>Cargando problemas del barrio...</p>
-      ) : errorMessage ? (
-        <p role="alert">No se pudieron cargar los reportes: {errorMessage}</p>
-      ) : reports.length === 0 ? (
-        <p>Todavía no hay problemas reportados.</p>
-      ) : (
-        <>
-          {selectedReport && (
-            <div className="sac-map-preview-card">
-              <div className="sac-report-thumb">{selectedReport.foto ? "IMG" : <Icon type="pin" size={19} />}</div>
-              <div className="sac-report-info">
-                <h3>{selectedReport.titulo}</h3>
-                <p>{selectedReport.direccion} • {new Date(selectedReport.fecha_reporte).toLocaleDateString("es-AR")}</p>
-                <span className={`sac-status-badge status-${getStatusClass(selectedReport.estado) === "red" ? "pending" : getStatusClass(selectedReport.estado) === "yellow" ? "in-process" : "resolved"} small-badge`}>
-                  {selectedReport.estado || "Pendiente"}
-                </span>
-              </div>
-              {googleMapsUrl && (
-                <a className="sac-map-link" href={googleMapsUrl} target="_blank" rel="noopener noreferrer">
-                  Abrir en Google Maps
-                </a>
-              )}
-            </div>
-          )}
-
-          {reportsWithLocation.length === 0 && (
-            <p className="sac-map-location-note">
-              Los reportes todavía no tienen coordenadas. Cuando se cargue una ubicación, aparecerá en el mapa.
-            </p>
-          )}
-
-          <div className="sac-reports-list">
-            {reports.map((report) => (
-              <button
-                className={`sac-report-card clickable ${selectedReport?.id_reporte === report.id_reporte ? "selected" : ""}`}
-                key={report.id_reporte}
-                type="button"
-                onClick={() => setSelectedReportId(report.id_reporte)}
-              >
-                <div className="sac-report-info">
-                  <h3>{report.titulo}</h3>
-                  <p>{report.direccion} • {new Date(report.fecha_reporte).toLocaleDateString("es-AR")}</p>
-                  <span className="sac-map-location-label">
-                    {getReportCoordinates(report) ? "Ver ubicación en el mapa" : "Ubicación no disponible"}
-                  </span>
-                </div>
-                <span className={`sac-status-badge status-${getStatusClass(report.estado) === "red" ? "pending" : getStatusClass(report.estado) === "yellow" ? "in-process" : "resolved"}`}>
-                  {report.estado || "Pendiente"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </AppLayout>
-  );
-}
-
-function ProfileScreen({ navigateTo, user, onLogout }) {
-  return (
-    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="7" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Perfil</h1>
-      <p className="sac-page-subtitle">Tus datos de cuenta</p>
-
-      <div className="sac-form-container">
-        <div className="sac-form-group">
-          <label className="sac-label">Nombre</label>
-          <div className="sac-textarea-wrapper">
-            <p>{user?.nombre || "-"}</p>
-          </div>
+      <div className="sac-map-preview-card" onClick={() => navigateTo("detalle-reporte")}>
+        <div className="sac-report-thumb">FOTO</div>
+        <div className="sac-report-info">
+          <h3>Bache en la calle</h3>
+          <p>Calle 12 y 5 • 08/09/2026</p>
+          <span className="sac-status-badge status-in-process small-badge">En proceso</span>
         </div>
-        <div className="sac-form-group">
-          <label className="sac-label">Apellido</label>
-          <div className="sac-textarea-wrapper">
-            <p>{user?.apellido || "-"}</p>
-          </div>
-        </div>
-        <div className="sac-form-group">
-          <label className="sac-label">Correo electrónico</label>
-          <div className="sac-textarea-wrapper">
-            <p>{user?.email || "-"}</p>
-          </div>
-        </div>
-        <div className="sac-form-group">
-          <label className="sac-label">Rol</label>
-          <div className="sac-textarea-wrapper">
-            <p>{user?.rol || "vecino"}</p>
-          </div>
-        </div>
+        <div className="sac-map-preview-arrow">▶</div>
       </div>
     </AppLayout>
   );
 }
 
-function NotificationsScreen({ navigateTo, user, onLogout }) {
-  const [items, setItems] = useState([]);
-
-  useEffect(() => {
-    async function cargar() {
-      try {
-        const data = await apiFetch("/notificaciones");
-        setItems(data.notificaciones || []);
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    cargar();
-  }, []);
-
-  const marcarLeidas = async () => {
-    try {
-      await apiFetch("/notificaciones/leer", { method: "PUT" });
-      const data = await apiFetch("/notificaciones");
-      setItems(data.notificaciones || []);
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  return (
-    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Notificaciones</h1>
-      <p className="sac-page-subtitle">Novedades sobre tus reportes</p>
-
-      <button className="sac-primary-btn" type="button" onClick={marcarLeidas}>
-        Marcar como leídas
-      </button>
-
-      <div className="sac-reports-list">
-        {items.length === 0 ? (
-          <p>No tenés notificaciones.</p>
-        ) : (
-          items.map((item) => (
-            <div className="sac-report-card" key={item.id_notificacion}>
-              <div className="sac-report-thumb"><Icon type="bell" size={19} /></div>
-              <div className="sac-report-info">
-                <h3>{item.tipo || "Nuevo aviso"}</h3>
-                <p>{item.mensaje}</p>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </AppLayout>
-  );
-}
-
-/* Pantalla: Detalle del reporte (S.A.C. - Pantalla 7) */
+/* Pantalla 7: Detalle del reporte */
 function ReportDetail({ navigateTo, user, onLogout }) {
   const [likes, setLikes] = useState(12);
   const [hasLiked, setHasLiked] = useState(false);
@@ -1480,52 +534,390 @@ function ReportDetail({ navigateTo, user, onLogout }) {
       <h1 className="sac-page-title">Detalle del reporte</h1>
       <p className="sac-page-subtitle">Información y seguimiento</p>
 
-      <div className="sac-detail-ca  rd">
-        {/* Banner de Imagen Principal */}
-        <div className="sac-detail-photo-placeholder">
-          <span>FOTO DEL REPORTE</span>
-        </div>
-
-        {/* Encabezado e Info Principal */}
+      <div className="sac-detail-card">
+        <div className="sac-detail-photo-placeholder"><span>FOTO DEL REPORTE</span></div>
         <h2 className="sac-detail-title">Bache en Av. 2</h2>
         
         <div className="sac-detail-meta-bar">
-          <div className="sac-meta-item">
-            <span className="sac-meta-icon"><Icon type="pin" size={16} /></span>
-            <span>Calle 12 y 5</span>
-          </div>
-          <div className="sac-meta-item">
-            <span className="sac-meta-icon"><Icon type="calendar" size={16} /></span>
-            <span>08/09/2026</span>
-          </div>
-          <div className="sac-meta-item">
-            <span className="sac-meta-icon"><Icon type="heart" size={16} /></span>
-            <span>{likes} vecinos lo apoyaron</span>
-          </div>
+          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="pin" size={15} /></span><span>Calle 12 y 5</span></div>
+          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="calendar" size={15} /></span><span>08/09/2026</span></div>
+          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="heart" size={15} /></span><span>{likes} vecinos lo apoyaron</span></div>
         </div>
 
-        <div className="sac-detail-status-wrapper">
-          <span className="sac-status-badge status-in-process">En proceso</span>
-        </div>
+        <div className="sac-detail-status-wrapper"><span className="sac-status-badge status-in-process">En proceso</span></div>
 
-        {/* Sección Descripción */}
         <div className="sac-detail-description-box">
           <h3>Descripción</h3>
-          <p>
-            El bache se encuentra en la esquina y dificulta el tránsito de los
-            vehículos. Ya ha causado varios inconvenientes.
-          </p>
+          <p>El bache se encuentra en la esquina y dificulta el tránsito de los vehículos. Ya ha causado varios inconvenientes.</p>
         </div>
-   
-        {/* Botón Acción Principal */}
-        <button 
-          className={`sac-support-button ${hasLiked ? "supported" : ""}`}
-          onClick={handleSupport}
-        >
+
+        <button className={`sac-support-button ${hasLiked ? "supported" : ""}`} onClick={handleSupport} type="button">
           <span className="sac-like-icon"><Icon type="like" size={18} /></span>
           <span>{hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
         </button>
       </div>
     </AppLayout>
+  );
+}
+
+/* Pantalla 8: Notificaciones */
+function NotificationsScreen({ navigateTo, user, onLogout }) {
+  const notifications = [
+    { id: 1, icon: "clipboard", iconBg: "#f97316", title: "Tu reporte fue revisado", desc: "El administrador revisó tu reporte #152.", time: "Hace 2 horas" },
+    { id: 2, icon: "pin", iconBg: "#f97316", title: "El municipio comenzó a trabajar", desc: "El área de Obras Públicas asignó tu reporte #152.", time: "Hace 5 horas" },
+    { id: 3, icon: "file", iconBg: "#f97316", title: "Tu reporte fue resuelto", desc: "El reporte Bache en Av. 2 fue marcado como resuelto.", time: "Hace 2 días" },
+    { id: 4, icon: "like", iconBg: "#ea580c", title: "Tu reporte fue apoyado", desc: "3 vecinos más apoyaron tu reporte #138.", time: "Hace 3 días" }
+  ];
+
+  return (
+    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Notificaciones</h1>
+      <p className="sac-page-subtitle">Enterate de todas las novedades</p>
+
+      <div className="sac-notifications-list">
+        {notifications.map((item) => (
+          <div className="sac-notification-card" key={item.id}>
+            <div className="sac-notification-icon-wrapper" style={{ backgroundColor: item.iconBg }}>
+              <Icon type={item.icon} size={20} />
+            </div>
+            <div className="sac-notification-content">
+              <h3>{item.title}</h3>
+              <p>{item.desc}</p>
+            </div>
+            <div className="sac-notification-time">{item.time}</div>
+          </div>
+        ))}
+      </div>
+    </AppLayout>
+  );
+}
+
+/* Pantalla 9: Guía de uso */
+function GuiaUsoScreen({ navigateTo, user, onLogout }) {
+  const pasos = [
+    { num: 1, icon: "pin", title: "1. Identificá el problema", desc: "Observá cualquier desperfecto o eventualidad en la vía pública (baches, alumbrado, basura, etc.)." },
+    { num: 2, icon: "camera", title: "2. Creá tu reporte", desc: "Ingresá a 'Reportar un problema', elegí la categoría adecuada, agregá una descripción detallada, la dirección exacta y adjuntá una foto." },
+    { num: 3, icon: "map", title: "3. Marcá la ubicación", desc: "Usá el botón de localización para guardar automáticamente las coordenadas del problema en el mapa del municipio." },
+    { num: 4, icon: "clipboard", title: "4. Hacé el seguimiento", desc: "Consultá el avance en 'Mis reportes' o enterate de cambios de estado (Pendiente, En proceso, Resuelto) desde 'Notificaciones'." },
+    { num: 5, icon: "heart", title: "5. Apoyá reportes de vecinos", desc: "Explorá el 'Mapa' de tu barrio y apoyá las incidencias de otros vecinos para darles más visibilidad ante el municipio." }
+  ];
+
+  return (
+    <AppLayout activeNav="guia" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Guía de uso</h1>
+      <p className="sac-page-subtitle">Aprende a sacar el máximo provecho del Sistema de Atención Ciudadana</p>
+
+      <div className="sac-guide-hero">
+        <div className="sac-guide-hero-icon"><Icon type="book" size={32} /></div>
+        <div>
+          <h2>¿Cómo funciona el S.A.C.?</h2>
+          <p>Esta plataforma está diseñada para que puedas reportar incidencias en tu barrio de forma rápida y sencilla.</p>
+        </div>
+      </div>
+
+      <div className="sac-guide-steps-list">
+        {pasos.map((step) => (
+          <div className="sac-guide-step-card" key={step.num}>
+            <div className="sac-guide-step-number">{step.num}</div>
+            <div className="sac-guide-step-icon"><Icon type={step.icon} size={22} /></div>
+            <div className="sac-guide-step-content">
+              <h3>{step.title}</h3>
+              <p>{step.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="sac-guide-footer-card">
+        <div>
+          <h3>¿Tenés un problema para reportar ahora?</h3>
+          <p>Sumá tu aporte y ayudá a construir un vecindario mejor.</p>
+        </div>
+        <button className="sac-primary-btn sac-guide-cta-btn" onClick={() => navigateTo("reportar-form")} type="button">
+          Crear reporte ahora
+        </button>
+      </div>
+    </AppLayout>
+  );
+}
+
+/* Pantalla 11: Perfil */
+function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [nombre, setNombre] = useState(user?.nombre || "Aisha");
+  const [apellido, setApellido] = useState(user?.apellido || "Gomez");
+  const [email, setEmail] = useState(user?.email || "aisha@gmail.com");
+  const [foto, setFoto] = useState(user?.foto || null);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    const updated = { ...user, nombre, apellido, email, foto };
+    setUser(updated);
+    setIsEditing(false);
+    setSuccessMsg("¡Perfil actualizado con éxito!");
+    setTimeout(() => setSuccessMsg(""), 3000);
+  };
+
+  const handlePhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFoto(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  return (
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="11" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Perfil</h1>
+      <p className="sac-page-subtitle">Administrá tu información y preferencias</p>
+
+      {successMsg && <p className="success-message">{successMsg}</p>}
+
+      {!isEditing ? (
+        <>
+          <div className="sac-profile-card-header">
+            <div className="sac-profile-avatar-large">
+              {foto ? <img src={foto} alt="Avatar" className="sac-avatar-img" /> : <span>👤</span>}
+            </div>
+            <div>
+              <h2>{nombre} {apellido}</h2>
+              <p>{email}</p>
+            </div>
+          </div>
+
+          <div className="sac-profile-menu-list">
+            <button className="sac-profile-menu-item" onClick={() => setIsEditing(true)} type="button">
+              <span className="p-icon">✏️</span>
+              <span>Editar perfil</span>
+              <span className="p-arrow">›</span>
+            </button>
+            <button className="sac-profile-menu-item" onClick={() => navigateTo("cambiar-contrasena")} type="button">
+              <span className="p-icon">🔒</span>
+              <span>Cambiar contraseña</span>
+              <span className="p-arrow">›</span>
+            </button>
+            <button className="sac-profile-menu-item" onClick={() => navigateTo("mis-reportes")} type="button">
+              <span className="p-icon">📄</span>
+              <span>Mis reportes</span>
+              <span className="p-arrow">›</span>
+            </button>
+            <button className="sac-profile-menu-item" onClick={() => navigateTo("notificaciones")} type="button">
+              <span className="p-icon">🔔</span>
+              <span>Notificaciones</span>
+              <span className="p-arrow">›</span>
+            </button>
+            <button className="sac-profile-menu-item" type="button">
+              <span className="p-icon">📞</span>
+              <span>Contacto</span>
+              <span className="p-arrow">›</span>
+            </button>
+          </div>
+        </>
+      ) : (
+        <form className="sac-form-container" onSubmit={handleSaveProfile}>
+          <div className="sac-form-group">
+            <label className="sac-label">Foto de perfil</label>
+            <input type="file" accept="image/*" onChange={handlePhotoChange} className="sac-input" />
+          </div>
+          <div className="sac-form-group">
+            <label className="sac-label">Nombre</label>
+            <input type="text" className="sac-input" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+          </div>
+          <div className="sac-form-group">
+            <label className="sac-label">Apellido</label>
+            <input type="text" className="sac-input" value={apellido} onChange={(e) => setApellido(e.target.value)} required />
+          </div>
+          <div className="sac-form-group">
+            <label className="sac-label">Correo electrónico</label>
+            <input type="email" className="sac-input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </div>
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button className="sac-primary-btn" type="submit">Guardar cambios</button>
+            <button className="sac-secondary-btn" type="button" onClick={() => setIsEditing(false)}>Cancelar</button>
+          </div>
+        </form>
+      )}
+    </AppLayout>
+  );
+}
+
+/* Pantalla 12: Cambiar contraseña */
+function ChangePasswordScreen({ navigateTo, user, onLogout }) {
+  const [actual, setActual] = useState("");
+  const [nueva, setNueva] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [msg, setMsg] = useState("");
+  const [error, setError] = useState("");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setError("");
+    setMsg("");
+
+    if (nueva !== confirmar) {
+      setError("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+
+    if (nueva.length < 6) {
+      setError("La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    setMsg("¡Contraseña actualizada correctamente!");
+    setTimeout(() => {
+      navigateTo("perfil");
+    }, 1200);
+  };
+
+  return (
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="12" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Cambiar contraseña</h1>
+      <p className="sac-page-subtitle">Por tu seguridad, te recomendamos usar una contraseña fuerte.</p>
+
+      <div className="sac-detail-card">
+        <form onSubmit={handleSubmit}>
+          <div className="sac-form-group">
+            <label className="sac-label">Contraseña actual</label>
+            <input
+              type="password"
+              className="sac-input"
+              placeholder="Contraseña"
+              value={actual}
+              onChange={(e) => setActual(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="sac-form-group">
+            <label className="sac-label">Nueva contraseña</label>
+            <input
+              type="password"
+              className="sac-input"
+              placeholder="Contraseña"
+              value={nueva}
+              onChange={(e) => setNueva(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="sac-form-group">
+            <label className="sac-label">Confirmar nueva contraseña</label>
+            <input
+              type="password"
+              className="sac-input"
+              placeholder="Contraseña"
+              value={confirmar}
+              onChange={(e) => setConfirmar(e.target.value)}
+              required
+            />
+          </div>
+
+          {error && <p className="error-message">{error}</p>}
+          {msg && <p className="success-message">{msg}</p>}
+
+          <button className="sac-primary-btn" type="submit" style={{ marginTop: "15px" }}>
+            Guardar cambios
+          </button>
+        </form>
+      </div>
+    </AppLayout>
+  );
+}
+
+/* Componente Principal App */
+export default function App() {
+  const [screen, setScreen] = useState("login");
+  const [user, setUser] = useState({ nombre: "Aisha", apellido: "Gomez", email: "aisha@gmail.com", foto: null });
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [registerForm, setRegisterForm] = useState({
+    DNI: "",
+    nombre: "",
+    apellido: "",
+    email: "",
+    contrasena: ""
+  });
+
+  const handleLoginSubmit = () => {
+    setSubmitting(true);
+    setErrorMessage("");
+    setTimeout(() => {
+      setUser((prev) => ({ ...prev, email: loginForm.email || prev.email }));
+      setSubmitting(false);
+      setScreen("home");
+    }, 500);
+  };
+
+  const handleRegisterSubmit = () => {
+    setSubmitting(true);
+    setErrorMessage("");
+    setTimeout(() => {
+      setSuccessMessage("¡Cuenta creada con éxito!");
+      setSubmitting(false);
+      setTimeout(() => {
+        setScreen("login");
+        setSuccessMessage("");
+      }, 1000);
+    }, 500);
+  };
+
+  const handleLogout = () => {
+    setScreen("login");
+  };
+
+  if (screen === "login") {
+    return (
+      <Login
+        goRegister={() => { setScreen("register"); setErrorMessage(""); }}
+        goHome={handleLoginSubmit}
+        loginForm={loginForm}
+        setLoginForm={setLoginForm}
+        submitting={submitting}
+        errorMessage={errorMessage}
+      />
+    );
+  }
+
+  if (screen === "register") {
+    return (
+      <Register
+        goLogin={() => { setScreen("login"); setErrorMessage(""); }}
+        registerForm={registerForm}
+        setRegisterForm={setRegisterForm}
+        submitting={submitting}
+        errorMessage={errorMessage}
+        successMessage={successMessage}
+        onSubmit={handleRegisterSubmit}
+      />
+    );
+  }
+
+  if (screen === "home") return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "reportar-form") return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "mis-reportes") return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "mapa") return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "detalle-reporte") return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "notificaciones") return <NotificationsScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "guia-uso") return <GuiaUsoScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "perfil") return <ProfileScreen navigateTo={setScreen} user={user} setUser={setUser} onLogout={handleLogout} />;
+  if (screen === "cambiar-contrasena") return <ChangePasswordScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+
+  return (
+    <Login
+      goRegister={() => setScreen("register")}
+      goHome={handleLoginSubmit}
+      loginForm={loginForm}
+      setLoginForm={setLoginForm}
+      submitting={submitting}
+      errorMessage={errorMessage}
+    />
   );
 }
