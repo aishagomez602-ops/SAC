@@ -296,9 +296,9 @@ router.delete(
 
             if (users[0].rol === "administrador") {
                 const [admins] = await connection.query(
-                    "SELECT COUNT(*) AS total FROM usuarios WHERE rol = 'administrador'"
+                    "SELECT id_usuario FROM usuarios WHERE rol = 'administrador' FOR UPDATE"
                 );
-                if (Number(admins[0].total) <= 1) {
+                if (admins.length <= 1) {
                     await connection.rollback();
                     return res.status(400).json({
                         ok: false,
@@ -396,50 +396,81 @@ router.put(
     verificarToken,
     verificarAdministrador,
     async (req, res) => {
+        const userId = Number(req.params.id);
+        const { rol } = req.body;
 
+        if (!Number.isInteger(userId) || userId <= 0) {
+            return res.status(400).json({
+                ok: false,
+                mensaje: "El identificador del usuario no es válido"
+            });
+        }
+
+        if (rol !== "vecino" && rol !== "administrador") {
+            return res.status(400).json({
+                ok: false,
+                mensaje: "Rol inválido"
+            });
+        }
+
+        if (userId === Number(req.usuario.id_usuario) && rol !== "administrador") {
+            return res.status(400).json({
+                ok: false,
+                mensaje: "No podés cambiar tu propio rol de administrador"
+            });
+        }
+
+        let connection;
         try {
+            connection = await conexion.getConnection();
+            await connection.beginTransaction();
 
-            const idUsuario =
-                req.params.id;
-
-            const { rol } = req.body;
-
-            if (
-                rol !== "vecino" &&
-                rol !== "administrador"
-            ) {
-                return res.status(400).json({
+            const [users] = await connection.query(
+                "SELECT id_usuario, rol FROM usuarios WHERE id_usuario = ? FOR UPDATE",
+                [userId]
+            );
+            if (users.length === 0) {
+                await connection.rollback();
+                return res.status(404).json({
                     ok: false,
-                    mensaje:
-                        "Rol inválido"
+                    mensaje: "Usuario no encontrado"
                 });
             }
 
-            await conexion.query(
+            if (users[0].rol === "administrador" && rol !== "administrador") {
+                const [admins] = await connection.query(
+                    "SELECT id_usuario FROM usuarios WHERE rol = 'administrador' FOR UPDATE"
+                );
+                if (admins.length <= 1) {
+                    await connection.rollback();
+                    return res.status(400).json({
+                        ok: false,
+                        mensaje: "No se puede quitar el rol al último administrador"
+                    });
+                }
+            }
+
+            await connection.query(
                 `UPDATE usuarios
                  SET rol = ?
                  WHERE id_usuario = ?`,
-                [
-                    rol,
-                    idUsuario
-                ]
+                [rol, userId]
             );
 
+            await connection.commit();
             res.json({
                 ok: true,
-                mensaje:
-                    "Rol actualizado correctamente"
+                mensaje: "Rol actualizado correctamente"
             });
-
         } catch (error) {
-
+            if (connection) await connection.rollback();
             console.error(error);
-
             res.status(500).json({
                 ok: false,
-                mensaje:
-                    "No se pudo cambiar el rol"
+                mensaje: "No se pudo cambiar el rol"
             });
+        } finally {
+            if (connection) connection.release();
         }
     }
 );

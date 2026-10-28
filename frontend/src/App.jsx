@@ -57,7 +57,9 @@ async function apiFetch(endpoint, options = {}) {
 
   if (!response.ok) {
     const message = typeof data === "string" ? data : data?.mensaje || "Error de conexión";
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;
@@ -123,6 +125,37 @@ const Icon = ({ type, size = 22 }) => {
     </svg>
   );
 };
+
+function getReportPhotoUrl(photo) {
+  if (typeof photo !== "string" || !photo.trim()) return "";
+  if (/^https?:\/\//i.test(photo)) return photo;
+  return `/${photo.replace(/^\/+/, "")}`;
+}
+
+function ReportPhoto({ photo, className, alt }) {
+  const [failed, setFailed] = useState(false);
+  const src = getReportPhotoUrl(photo);
+
+  if (!src || failed) {
+    return (
+      <span className={`${className} sac-report-photo-fallback`} role="img" aria-label="Foto no disponible">
+        <Icon type="camera" size={20} />
+        <span>Sin foto</span>
+      </span>
+    );
+  }
+
+  return (
+    <img
+      className={className}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 function Logo() {
   return (
@@ -601,12 +634,12 @@ function ReportForm({ navigateTo, user, onLogout }) {
 
           <div className="sac-form-group">
             <label className="sac-label">Agregar una foto (opcional)</label>
-            <input id="reporte-foto" className="sac-file-input" type="file" accept="image/*" onChange={handlePhotoChange} />
+            <input id="reporte-foto" className="sac-file-input" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handlePhotoChange} />
             <label className="sac-upload-box" htmlFor="reporte-foto">
               <span className="sac-upload-icon"><Icon type="camera" size={22} /></span>
               <span className="sac-upload-copy">
                 <strong>{fotoNombre || "Elegí una imagen"}</strong>
-                <small>{fotoNombre ? "Seleccioná otro archivo para reemplazarla" : "JPG, PNG o GIF · hasta 5 MB"}</small>
+                <small>{fotoNombre ? "Seleccioná otro archivo para reemplazarla" : "JPG, PNG, GIF o WEBP · hasta 5 MB"}</small>
               </span>
               <span className="sac-upload-action">{fotoNombre ? "Cambiar" : "Buscar archivo"}</span>
               {fotoPreview && <img src={fotoPreview} alt="Vista previa" className="sac-upload-preview" />}
@@ -638,7 +671,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
 }
 
 /* Pantalla 5: Lista de Mis Reportes */
-function MyReports({ navigateTo, user, onLogout }) {
+function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
   const [filter, setFilter] = useState("todos");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -697,10 +730,15 @@ function MyReports({ navigateTo, user, onLogout }) {
           <p className="sac-admin-empty">No hay reportes para mostrar en este filtro.</p>
         )}
         {filteredReports.map((item) => (
-          <div className="sac-report-card clickable" key={item.id_reporte} onClick={() => navigateTo("detalle-reporte")}>
-            {item.foto
-              ? <img className="sac-report-thumb" src={item.foto} alt="" />
-              : <div className="sac-report-thumb">S.A.C.</div>}
+          <div
+            className="sac-report-card clickable"
+            key={item.id_reporte}
+            onClick={() => {
+              setSelectedReportId(item.id_reporte);
+              navigateTo("detalle-reporte");
+            }}
+          >
+            <ReportPhoto className="sac-report-thumb" photo={item.foto} alt={`Foto del reporte ${item.titulo}`} />
             <div className="sac-report-info">
               <h3>{item.titulo}</h3>
               <p>{item.direccion} • {item.fecha_reporte ? new Date(item.fecha_reporte).toLocaleDateString("es-AR") : ""}</p>
@@ -837,7 +875,9 @@ function MapScreen({ navigateTo, user, onLogout }) {
               type="button"
               aria-pressed={selectedReportId === report.id_reporte}
             >
-              <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>
+              {report.foto
+                ? <ReportPhoto className="sac-map-report-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
+                : <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>}
               <span className="sac-map-report-details">
                 <strong>{report.titulo}</strong>
                 <span className="sac-map-report-location">{report.direccion || "Ubicación no informada"}</span>
@@ -853,9 +893,36 @@ function MapScreen({ navigateTo, user, onLogout }) {
 }
 
 /* Pantalla 7: Detalle del reporte */
-function ReportDetail({ navigateTo, user, onLogout }) {
-  const [likes, setLikes] = useState(12);
+function ReportDetail({ navigateTo, user, onLogout, reportId }) {
+  const [report, setReport] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [likes, setLikes] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+
+    apiFetch(`/reportes/${reportId}`)
+      .then((response) => {
+        if (!active) return;
+        setReport(response.reporte);
+        setLikes(Number(response.apoyos) || 0);
+      })
+      .catch((requestError) => {
+        console.error(`No se pudo cargar el reporte ${reportId}.`, requestError);
+        if (active) setError(requestError.message || "No se pudo cargar el reporte.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reportId]);
 
   const handleSupport = () => {
     if (!hasLiked) {
@@ -872,28 +939,35 @@ function ReportDetail({ navigateTo, user, onLogout }) {
       <h1 className="sac-page-title">Detalle del reporte</h1>
       <p className="sac-page-subtitle">Información y seguimiento</p>
 
-      <div className="sac-detail-card">
-        <div className="sac-detail-photo-placeholder"><span>FOTO DEL REPORTE</span></div>
-        <h2 className="sac-detail-title">Bache en Av. 2</h2>
-        
-        <div className="sac-detail-meta-bar">
-          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="pin" size={15} /></span><span>Calle 12 y 5</span></div>
-          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="calendar" size={15} /></span><span>08/09/2026</span></div>
-          <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="heart" size={15} /></span><span>{likes} vecinos lo apoyaron</span></div>
+      {loading && <p className="sac-admin-empty">Cargando reporte...</p>}
+      {error && <p className="error-message" role="alert">{error}</p>}
+      {!loading && !error && !report && <p className="sac-admin-empty">No se encontró el reporte.</p>}
+      {report && (
+        <div className="sac-detail-card">
+          <ReportPhoto className="sac-detail-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
+          <h2 className="sac-detail-title">{report.titulo}</h2>
+
+          <div className="sac-detail-meta-bar">
+            <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="pin" size={15} /></span><span>{report.direccion || "Ubicación no informada"}</span></div>
+            <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="calendar" size={15} /></span><span>{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : "Fecha no disponible"}</span></div>
+            <div className="sac-meta-item"><span className="sac-meta-icon"><Icon type="heart" size={15} /></span><span>{likes} vecinos lo apoyaron</span></div>
+          </div>
+
+          <div className="sac-detail-status-wrapper"><span className="sac-status-badge">{report.estado || "Sin estado"}</span></div>
+
+          <div className="sac-detail-description-box">
+            <h3>Descripción</h3>
+            <p>{report.descripcion || "Sin descripción."}</p>
+            {report.categoria && <p><strong>Categoría:</strong> {report.categoria}</p>}
+            {report.vecino && <p><strong>Reportado por:</strong> {report.vecino}</p>}
+          </div>
+
+          <button className={`sac-support-button ${hasLiked ? "supported" : ""}`} onClick={handleSupport} type="button">
+            <span className="sac-like-icon"><Icon type="like" size={18} /></span>
+            <span>{hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
+          </button>
         </div>
-
-        <div className="sac-detail-status-wrapper"><span className="sac-status-badge status-in-process">En proceso</span></div>
-
-        <div className="sac-detail-description-box">
-          <h3>Descripción</h3>
-          <p>El bache se encuentra en la esquina y dificulta el tránsito de los vehículos. Ya ha causado varios inconvenientes.</p>
-        </div>
-
-        <button className={`sac-support-button ${hasLiked ? "supported" : ""}`} onClick={handleSupport} type="button">
-          <span className="sac-like-icon"><Icon type="like" size={18} /></span>
-          <span>{hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
-        </button>
-      </div>
+      )}
     </AppLayout>
   );
 }
@@ -1239,7 +1313,9 @@ function AdminScreen({ navigateTo, user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingReportId, setUpdatingReportId] = useState(null);
+  const [updatingUserRoleId, setUpdatingUserRoleId] = useState(null);
   const [deletingRecord, setDeletingRecord] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -1248,29 +1324,43 @@ function AdminScreen({ navigateTo, user, onLogout }) {
       setLoading(true);
       setError("");
 
-      try {
-        const [reportsResponse, usersResponse, statesResponse] = await Promise.all([
-          apiFetch("/admin/reportes"),
-          apiFetch("/admin/usuarios"),
-          apiFetch("/admin/estados")
-        ]);
-        if (!active) return;
-        setReportes(reportsResponse.reportes || []);
-        setUsuarios(usersResponse.usuarios || []);
-        setEstados(statesResponse.estados || []);
-      } catch (requestError) {
-        console.error("No se pudieron cargar los datos de administración.", requestError);
-        if (active) setError(requestError.message || "No se pudieron cargar los datos reales.");
-      } finally {
-        if (active) setLoading(false);
+      const results = await Promise.allSettled([
+        apiFetch("/admin/reportes"),
+        apiFetch("/admin/usuarios"),
+        apiFetch("/admin/estados")
+      ]);
+      if (!active) return;
+
+      const failures = [];
+      const [reportsResult, usersResult, statesResult] = results;
+      if (reportsResult.status === "fulfilled") {
+        setReportes(reportsResult.value.reportes || []);
+      } else {
+        console.error("No se pudieron cargar los reportes administrativos.", reportsResult.reason);
+        failures.push(`Reportes: ${reportsResult.reason.message || "no disponibles"}`);
       }
+      if (usersResult.status === "fulfilled") {
+        setUsuarios(usersResult.value.usuarios || []);
+      } else {
+        console.error("No se pudieron cargar los usuarios administrativos.", usersResult.reason);
+        failures.push(`Usuarios: ${usersResult.reason.message || "no disponibles"}`);
+      }
+      if (statesResult.status === "fulfilled") {
+        setEstados(statesResult.value.estados || []);
+      } else {
+        console.error("No se pudieron cargar los estados administrativos.", statesResult.reason);
+        failures.push(`Estados: ${statesResult.reason.message || "no disponibles"}`);
+      }
+
+      if (failures.length) setError(`No se pudieron cargar todos los datos. ${failures.join(". ")}`);
+      setLoading(false);
     };
 
     loadAdminData();
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const normalizeStatus = (status) => String(status || "").trim().toLocaleLowerCase("es");
   const pendingCount = reportes.filter((report) => normalizeStatus(report.estado).includes("pendiente")).length;
@@ -1380,6 +1470,33 @@ function AdminScreen({ navigateTo, user, onLogout }) {
     }
   };
 
+  const handleUserRoleChange = async (registeredUser, rol) => {
+    if (
+      rol === "administrador"
+      && registeredUser.rol !== "administrador"
+      && !window.confirm(`¿Dar permisos de administrador a ${registeredUser.nombre || registeredUser.email}?`)
+    ) {
+      return;
+    }
+
+    setError("");
+    setUpdatingUserRoleId(registeredUser.id_usuario);
+    try {
+      await apiFetch(`/admin/usuarios/${registeredUser.id_usuario}/rol`, {
+        method: "PUT",
+        body: JSON.stringify({ rol })
+      });
+      setUsuarios((current) => current.map((item) => (
+        item.id_usuario === registeredUser.id_usuario ? { ...item, rol } : item
+      )));
+    } catch (requestError) {
+      console.error(`No se pudo cambiar el rol del usuario ${registeredUser.id_usuario}.`, requestError);
+      setError(requestError.message || "No se pudo cambiar el rol del usuario.");
+    } finally {
+      setUpdatingUserRoleId(null);
+    }
+  };
+
   return (
     <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="10" user={user} onLogout={onLogout}>
       <div className="sac-admin-section">
@@ -1402,7 +1519,19 @@ function AdminScreen({ navigateTo, user, onLogout }) {
         ))}
       </div>
 
-      {error && <p className="error-message" role="alert">{error}</p>}
+      {error && (
+        <div className="sac-admin-error" role="alert">
+          <p className="error-message">{error}</p>
+          <button
+            type="button"
+            className="sac-admin-retry-btn"
+            onClick={() => setReloadKey((key) => key + 1)}
+            disabled={loading}
+          >
+            {loading ? "Cargando..." : "Reintentar"}
+          </button>
+        </div>
+      )}
 
       <div className="sac-admin-section">
         <div className="sac-admin-section-header">
@@ -1438,14 +1567,17 @@ function AdminScreen({ navigateTo, user, onLogout }) {
             const currentState = estados.find((state) => state.nombre === report.estado);
             return (
               <div className="sac-admin-row" key={report.id_reporte}>
-                <div>
-                  <strong>#{report.id_reporte} · {report.titulo}</strong>
-                  <span>{report.direccion || "Ubicación no informada"} · {report.vecino || "Vecino"}</span>
-                  <span>{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : "Fecha no disponible"}</span>
-                  {report.descripcion && <span>{report.descripcion}</span>}
-                  <span className={`sac-review-status ${report.estado_revision}`}>
-                    Revisión: {report.estado_revision === "aprobado" ? "Aprobado" : report.estado_revision === "rechazado" ? "Rechazado" : "Pendiente"}
-                  </span>
+                <div className="sac-admin-report-summary">
+                  <ReportPhoto className="sac-admin-report-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
+                  <div className="sac-admin-report-copy">
+                    <strong>#{report.id_reporte} · {report.titulo}</strong>
+                    <span>{report.direccion || "Ubicación no informada"} · {report.vecino || "Vecino"}</span>
+                    <span>{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : "Fecha no disponible"}</span>
+                    {report.descripcion && <span>{report.descripcion}</span>}
+                    <span className={`sac-review-status ${report.estado_revision}`}>
+                      Revisión: {report.estado_revision === "aprobado" ? "Aprobado" : report.estado_revision === "rechazado" ? "Rechazado" : "Pendiente"}
+                    </span>
+                  </div>
                 </div>
                 <div className="sac-admin-control">
                   {report.estado_revision === "pendiente" && (
@@ -1514,7 +1646,24 @@ function AdminScreen({ navigateTo, user, onLogout }) {
                 <strong>{`${registeredUser.nombre || ""} ${registeredUser.apellido || ""}`.trim() || "Sin nombre"}</strong>
                 <span>{registeredUser.email}</span>
               </span>
-              <span className="sac-admin-user-role">{registeredUser.rol}</span>
+              <label className="sac-admin-role-control">
+                <span className="sac-sr-only">Rol de {registeredUser.nombre || registeredUser.email}</span>
+                <select
+                  className="sac-admin-role-select"
+                  value={registeredUser.rol}
+                  onChange={(event) => handleUserRoleChange(registeredUser, event.target.value)}
+                  disabled={
+                    Boolean(deletingRecord)
+                    || updatingUserRoleId !== null
+                    || String(registeredUser.id_usuario) === String(user?.id_usuario)
+                  }
+                  title={String(registeredUser.id_usuario) === String(user?.id_usuario) ? "No podés cambiar tu propio rol" : "Cambiar rol del usuario"}
+                >
+                  <option value="vecino">Vecino</option>
+                  <option value="administrador">Administrador</option>
+                </select>
+                {updatingUserRoleId === registeredUser.id_usuario && <span className="sac-role-saving">Guardando...</span>}
+              </label>
               <span className="sac-admin-user-date">
                 {registeredUser.fecha_registro ? new Date(registeredUser.fecha_registro).toLocaleDateString("es-AR") : "Fecha no disponible"}
               </span>
@@ -1539,6 +1688,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
 export default function App() {
   const [initialSession] = useState(() => getStoredSession());
   const [screen, setScreen] = useState(initialSession ? "home" : "login");
+  const [selectedReportId, setSelectedReportId] = useState(null);
   const [user, setUser] = useState({
     ...(initialSession?.user || {
       nombre: "Aisha",
@@ -1711,9 +1861,14 @@ export default function App() {
 
   if (screen === "home") return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "reportar-form") return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  if (screen === "mis-reportes") return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "mis-reportes") return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} setSelectedReportId={setSelectedReportId} />;
   if (screen === "mapa") return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
-  if (screen === "detalle-reporte") return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "detalle-reporte") {
+    if (selectedReportId) {
+      return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} reportId={selectedReportId} />;
+    }
+    return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} setSelectedReportId={setSelectedReportId} />;
+  }
   if (screen === "notificaciones") return <NotificationsScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "guia-uso") return <GuiaUsoScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "perfil") return <ProfileScreen navigateTo={setScreen} user={user} setUser={setUser} onLogout={handleLogout} />;

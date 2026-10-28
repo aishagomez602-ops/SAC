@@ -1,6 +1,8 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
+const crypto = require("crypto");
 
 const conexion = require("../db");
 const {
@@ -14,23 +16,23 @@ const router = express.Router();
 // CONFIGURACIÓN DE FOTOS
 // ========================================
 
-const almacenamiento = multer.diskStorage({
+const directorioFotos = path.resolve(__dirname, "..", "uploads", "reportes");
+const extensionesImagen = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/gif": ".gif",
+    "image/webp": ".webp"
+};
 
+const almacenamiento = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, "uploads/reportes");
+        fs.mkdir(directorioFotos, { recursive: true }, (error) => {
+            cb(error, directorioFotos);
+        });
     },
 
     filename: (req, file, cb) => {
-
-        const extension =
-            path.extname(file.originalname);
-
-        const nombre =
-            "reporte_" +
-            Date.now() +
-            extension;
-
-        cb(null, nombre);
+        cb(null, `reporte_${Date.now()}_${crypto.randomBytes(6).toString("hex")}${extensionesImagen[file.mimetype]}`);
     }
 });
 
@@ -38,6 +40,13 @@ const subirFoto = multer({
     storage: almacenamiento,
     limits: {
         fileSize: 5 * 1024 * 1024
+    },
+    fileFilter: (req, file, cb) => {
+        if (!extensionesImagen[file.mimetype]) {
+            cb(new Error("El archivo debe ser JPG, PNG, GIF o WEBP."));
+            return;
+        }
+        cb(null, true);
     }
 });
 
@@ -545,5 +554,20 @@ router.post(
     }
 );
 
+router.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError) {
+        const status = error.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+        const mensaje = error.code === "LIMIT_FILE_SIZE"
+            ? "La imagen no puede superar los 5 MB"
+            : "No se pudo procesar la imagen adjunta";
+        return res.status(status).json({ ok: false, mensaje });
+    }
+
+    if (error.message === "El archivo debe ser JPG, PNG, GIF o WEBP.") {
+        return res.status(400).json({ ok: false, mensaje: error.message });
+    }
+
+    next(error);
+});
 
 module.exports = router;
