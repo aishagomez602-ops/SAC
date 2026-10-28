@@ -2,14 +2,37 @@ import { useState, useEffect } from "react";
 import "./App.css";
 
 const API_URL = "/api";
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
-function getStoredUser() {
-  try {
-    const user = localStorage.getItem("sac_user");
-    return user ? JSON.parse(user) : null;
-  } catch {
+function clearStoredSession() {
+  localStorage.removeItem("sac_user");
+  localStorage.removeItem("sac_token");
+  localStorage.removeItem("sac_session_expires_at");
+}
+
+function getStoredSession() {
+  const serializedUser = localStorage.getItem("sac_user");
+  const token = localStorage.getItem("sac_token");
+  if (!serializedUser || !token) {
+    if (serializedUser || localStorage.getItem("sac_session_expires_at")) clearStoredSession();
     return null;
   }
+
+  let user;
+  try {
+    user = JSON.parse(serializedUser);
+  } catch {
+    clearStoredSession();
+    return null;
+  }
+
+  const expiresAt = Number(localStorage.getItem("sac_session_expires_at"));
+  if (!user || typeof user !== "object" || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    clearStoredSession();
+    return null;
+  }
+
+  return { user, expiresAt };
 }
 
 async function apiFetch(endpoint, options = {}) {
@@ -90,7 +113,8 @@ const Icon = ({ type, size = 22 }) => {
     wrench: <><path d="M14 6a5 5 0 0 0-6 6L3 17a2 2 0 0 0 3 3l5-5a5 5 0 0 0 6-6l-3 3-3-3z" /></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
     heart: <path d="M20.8 8.8c0 5.5-8.8 11-8.8 11s-8.8-5.5-8.8-11a4.8 4.8 0 0 1 8.8-2.5 4.8 4.8 0 0 1 8.8 2.5Z" />,
-    like: <><path d="M7 10v11H4V10zM7 20h9a2 2 0 0 0 2-1.6l1.5-7A2 2 0 0 0 17.5 9H13l.7-3.2A2.3 2.3 0 0 0 11.5 3L7 10" /></>
+    like: <><path d="M7 10v11H4V10zM7 20h9a2 2 0 0 0 2-1.6l1.5-7A2 2 0 0 0 17.5 9H13l.7-3.2A2.3 2.3 0 0 0 11.5 3L7 10" /></>,
+    phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.08 4.18 2 2 0 0 1 5 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.77.68 2.6.23.6.01 1.31-.53 1.78L8.7 9.29a16 16 0 0 0 6.01 6.01l1.19-1.42c.47-.54 1.18-.76 1.78-.53.83.33 1.7.56 2.6.68A2 2 0 0 1 22 16.92Z" /></>
   };
 
   return (
@@ -233,10 +257,22 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
   );
 }
 
+function getUserDisplayName(user) {
+  if (!user) return "Aisha Gomez";
+  const nombre = String(user.nombre || user.name || "").trim();
+  const apellido = String(user.apellido || user.lastName || "").trim();
+  const email = user.email || user.correo;
+  if (!nombre && !apellido && email) return String(email).split("@")[0];
+  return `${nombre} ${apellido}`.trim() || "Aisha Gomez";
+}
+
+function isAdministrator(user) {
+  return String(user?.rol || "").trim().toLocaleLowerCase("es") === "administrador";
+}
+
 function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogout }) {
-  const nombreUsuario = user?.nombre
-    ? `${user.nombre} ${user.apellido || ""}`.trim()
-    : "Aisha Gomez";
+  const nombreUsuario = getUserDisplayName(user);
+  const isAdmin = isAdministrator(user);
 
   return (
     <div className="sac-app-container">
@@ -249,9 +285,12 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
           </div>
         </div>
         <div className="sac-user-profile">
-          <span className="sac-user-avatar"><Icon type="user" size={17} /></span>
+          <span className="sac-user-avatar">
+            {user?.foto
+              ? <img src={user.foto} alt="" className="sac-user-avatar-image" />
+              : <Icon type="user" size={17} />}
+          </span>
           <span className="sac-user-name">{nombreUsuario}</span>
-          <span className="sac-user-arrow">⌄</span>
           {onLogout && (
             <button className="sac-logout-btn" onClick={onLogout} type="button">
               Salir
@@ -279,24 +318,34 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               <span className="sac-nav-icon"><Icon type="file" size={19} /></span>
               <span>Reportes</span>
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={`sac-nav-item ${activeNav === "mapa" ? "active" : ""}`}
               onClick={() => navigateTo("mapa")}
             >
               <span className="sac-nav-icon"><Icon type="map" size={19} /></span>
               <span>Mapa</span>
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className={`sac-nav-item ${activeNav === "notificaciones" ? "active" : ""}`}
               onClick={() => navigateTo("notificaciones")}
             >
               <span className="sac-nav-icon"><Icon type="bell" size={19} /></span>
               <span>Notificaciones</span>
             </button>
-            <button 
-              type="button" 
+            {isAdmin && (
+              <button
+                type="button"
+                className={`sac-nav-item ${activeNav === "admin" ? "active" : ""}`}
+                onClick={() => navigateTo("admin")}
+              >
+                <span className="sac-nav-icon"><Icon type="wrench" size={19} /></span>
+                <span>Admin</span>
+              </button>
+            )}
+            <button
+              type="button"
               className={`sac-nav-item ${activeNav === "perfil" ? "active" : ""}`}
               onClick={() => navigateTo("perfil")}
             >
@@ -345,7 +394,7 @@ function Dashboard({ navigateTo, user, onLogout }) {
             <p>Tu aporte hace la diferencia</p>
           </div>
         </div>
-        <div className="sac-hero-arrow">➔</div>
+        <div className="sac-hero-arrow" aria-hidden="true">→</div>
       </div>
 
       <div className="sac-dashboard-grid">
@@ -373,6 +422,119 @@ function Dashboard({ navigateTo, user, onLogout }) {
 
 /* Pantalla 4: Formulario de Reporte */
 function ReportForm({ navigateTo, user, onLogout }) {
+  const [categoria, setCategoria] = useState("");
+  const [categorias, setCategorias] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [descripcion, setDescripcion] = useState("");
+  const [ubicacion, setUbicacion] = useState("");
+  const [coordenadas, setCoordenadas] = useState(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
+  const [reportSaveError, setReportSaveError] = useState("");
+  const [fotoPreview, setFotoPreview] = useState("");
+  const [fotoNombre, setFotoNombre] = useState("");
+  const [fotoFile, setFotoFile] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/categorias")
+      .then((response) => {
+        if (active) setCategorias(response.categorias || []);
+      })
+      .catch((error) => {
+        console.error("No se pudieron cargar las categorías.", error);
+        if (active) setReportSaveError(error.message || "No se pudieron cargar las categorías.");
+      })
+      .finally(() => {
+        if (active) setLoadingCategories(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleGetLocation = () => {
+    setLocationError("");
+
+    if (!navigator.geolocation) {
+      setLocationError("Este navegador no permite obtener la ubicación. Ingresá la dirección manualmente.");
+      return;
+    }
+
+    if (!window.isSecureContext) {
+      setLocationError("Para obtener la ubicación, abrí el sitio desde una conexión segura (HTTPS) o desde localhost.");
+      return;
+    }
+
+    setLoadingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const currentCoordinates = {
+          latitud: coords.latitude,
+          longitud: coords.longitude
+        };
+        setCoordenadas(currentCoordinates);
+        setUbicacion(`Mi ubicación (${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)})`);
+        setLoadingLocation(false);
+      },
+      (error) => {
+        const messages = {
+          1: "No se concedió permiso de ubicación. Podés habilitarlo en el navegador o ingresar una dirección manualmente.",
+          2: "No se pudo determinar tu ubicación. Intentá nuevamente o ingresá una dirección manualmente.",
+          3: "La solicitud de ubicación tardó demasiado. Intentá nuevamente o ingresá una dirección manualmente."
+        };
+        setLocationError(messages[error.code] || "No se pudo acceder a la ubicación. Ingresá una dirección manualmente.");
+        setLoadingLocation(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
+  const handlePhotoChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setFotoFile(file);
+    setFotoNombre(file.name);
+
+    const reader = new FileReader();
+    reader.onload = () => setFotoPreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = async () => {
+    if (!categoria || !descripcion.trim() || !ubicacion.trim()) return;
+    setReportSaveError("");
+    setSubmitting(true);
+
+    const formData = new FormData();
+    const selectedCategory = categorias.find((item) => String(item.id_categoria) === categoria);
+    formData.append("id_categoria", categoria);
+    formData.append("titulo", `${selectedCategory?.nombre || "Reporte"}: ${descripcion.trim().slice(0, 100)}`);
+    formData.append("descripcion", descripcion.trim());
+    formData.append("direccion", ubicacion.trim());
+    if (coordenadas) {
+      formData.append("latitud", String(coordenadas.latitud));
+      formData.append("longitud", String(coordenadas.longitud));
+    }
+    if (fotoFile) formData.append("foto", fotoFile);
+
+    try {
+      await apiFetch("/reportes/crear", {
+        method: "POST",
+        body: formData
+      });
+      navigateTo("mis-reportes");
+    } catch (error) {
+      console.error("No se pudo enviar el reporte.", error);
+      setReportSaveError(error.message || "No se pudo enviar el reporte. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Reportar un problema</h1>
@@ -383,16 +545,11 @@ function ReportForm({ navigateTo, user, onLogout }) {
           <div className="sac-form-group">
             <label className="sac-label">Categoría</label>
             <div className="sac-select-wrapper">
-              <select className="sac-select" defaultValue="">
-                <option value="" disabled>Elegí el tipo de problema</option>
-                <option value="calles">Calles y veredas</option>
-                <option value="alumbrado">Alumbrado</option>
-                <option value="basura">Basura</option>
-                <option value="agua">Agua</option>
-                <option value="espacios">Espacios verdes</option>
-                <option value="transito">Tránsito</option>
-                <option value="senalizacion">Señalización</option>
-                <option value="otro">Otro</option>
+              <select className="sac-select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={loadingCategories}>
+                <option value="" disabled>{loadingCategories ? "Cargando categorías..." : "Elegí el tipo de problema"}</option>
+                {categorias.map((item) => (
+                  <option key={item.id_categoria} value={item.id_categoria}>{item.nombre}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -400,37 +557,80 @@ function ReportForm({ navigateTo, user, onLogout }) {
           <div className="sac-form-group">
             <label className="sac-label">Descripción</label>
             <div className="sac-textarea-wrapper">
-              <textarea className="sac-textarea" placeholder="Contanos qué sucede..." maxLength={500}></textarea>
-              <span className="sac-char-count">0/500</span>
+              <textarea
+                className="sac-textarea"
+                placeholder="Contanos qué sucede..."
+                maxLength={500}
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+              ></textarea>
+              <span className="sac-char-count">{descripcion.length}/500</span>
             </div>
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Agregar una foto (opcional)</label>
-            <div className="sac-upload-box">
-              <div className="sac-camera-icon">📷</div>
-              <p>Seleccioná una imagen<br />o arrastrala aquí</p>
-            </div>
+            <label className="sac-label" htmlFor="reporte-ubicacion">Ubicación del problema</label>
+            <input
+              id="reporte-ubicacion"
+              className="sac-input"
+              type="text"
+              placeholder="Ingresá una dirección o usá tu ubicación actual"
+              value={ubicacion}
+              onChange={(event) => {
+                setUbicacion(event.target.value);
+                setCoordenadas(null);
+              }}
+              required
+            />
+            <button className="sac-location-btn" onClick={handleGetLocation} type="button" disabled={loadingLocation}>
+              <Icon type="pin" size={16} />
+              {loadingLocation ? "Obteniendo ubicación..." : "Usar mi ubicación actual"}
+            </button>
+            <p className="sac-location-description">
+              El navegador te pedirá permiso para compartir tu ubicación. Si no querés habilitarla, podés escribir la dirección.
+            </p>
+            {coordenadas && (
+              <p className="sac-location-coordinates">
+                Ubicación guardada: {coordenadas.latitud.toFixed(5)}, {coordenadas.longitud.toFixed(5)}
+              </p>
+            )}
+            {locationError && <p className="error-message" role="alert">{locationError}</p>}
           </div>
 
-          <button className="sac-primary-btn" onClick={() => navigateTo("mis-reportes")} type="button">
-            Enviar reporte
+          {reportSaveError && <p className="error-message" role="alert">{reportSaveError}</p>}
+
+          <div className="sac-form-group">
+            <label className="sac-label">Agregar una foto (opcional)</label>
+            <input id="reporte-foto" className="sac-file-input" type="file" accept="image/*" onChange={handlePhotoChange} />
+            <label className="sac-upload-box" htmlFor="reporte-foto">
+              <span className="sac-upload-icon"><Icon type="camera" size={22} /></span>
+              <span className="sac-upload-copy">
+                <strong>{fotoNombre || "Elegí una imagen"}</strong>
+                <small>{fotoNombre ? "Seleccioná otro archivo para reemplazarla" : "JPG, PNG o GIF · hasta 5 MB"}</small>
+              </span>
+              <span className="sac-upload-action">{fotoNombre ? "Cambiar" : "Buscar archivo"}</span>
+              {fotoPreview && <img src={fotoPreview} alt="Vista previa" className="sac-upload-preview" />}
+            </label>
+          </div>
+
+          <button className="sac-primary-btn" onClick={handleSubmit} type="button" disabled={submitting || loadingCategories || !categoria || !descripcion.trim() || !ubicacion.trim()}>
+            {submitting ? "Enviando..." : "Enviar reporte"}
           </button>
         </div>
 
         <div className="sac-categories-sidebar">
           <h3>Categorías</h3>
           <ul className="sac-categories-list">
-            <li><span className="cat-icon">🚧</span> Calles y veredas</li>
-            <li><span className="cat-icon">💡</span> Alumbrado</li>
-            <li><span className="cat-icon">🗑️</span> Basura</li>
-            <li><span className="cat-icon">🚰</span> Agua</li>
-            <li><span className="cat-icon">🌱</span> Espacios verdes</li>
-            <li><span className="cat-icon">🚗</span> Tránsito</li>
-            <li><span className="cat-icon">⚠️</span> Señalización</li>
-            <li><span className="cat-icon">🔧</span> Otro</li>
+            <li><span className="cat-icon"><Icon type="road" size={14} /></span> Calles y veredas</li>
+            <li><span className="cat-icon"><Icon type="light" size={14} /></span> Alumbrado</li>
+            <li><span className="cat-icon"><Icon type="trash" size={14} /></span> Basura</li>
+            <li><span className="cat-icon"><Icon type="water" size={14} /></span> Agua</li>
+            <li><span className="cat-icon"><Icon type="leaf" size={14} /></span> Espacios verdes</li>
+            <li><span className="cat-icon"><Icon type="car" size={14} /></span> Tránsito</li>
+            <li><span className="cat-icon"><Icon type="warning" size={14} /></span> Señalización</li>
+            <li><span className="cat-icon"><Icon type="wrench" size={14} /></span> Otro</li>
           </ul>
-          <div className="sac-plant-decoration">🪴</div>
+          <div className="sac-plant-decoration"><Icon type="leaf" size={28} /></div>
         </div>
       </div>
     </AppLayout>
@@ -440,12 +640,43 @@ function ReportForm({ navigateTo, user, onLogout }) {
 /* Pantalla 5: Lista de Mis Reportes */
 function MyReports({ navigateTo, user, onLogout }) {
   const [filter, setFilter] = useState("todos");
+  const [reports, setReports] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const reports = [
-    { id: 1, title: "Bache en la calle", location: "Calle 12 y 5", date: "08/09/2026", status: "En proceso", statusClass: "status-in-process" },
-    { id: 2, title: "Basura en la vereda", location: "Calle 12 y 5", date: "08/09/2026", status: "Pendiente", statusClass: "status-pending" },
-    { id: 3, title: "Falta de alumbrado", location: "Calle 12 y 5", date: "08/09/2026", status: "Resuelto", statusClass: "status-resolved" },
-  ];
+  useEffect(() => {
+    let active = true;
+    apiFetch("/reportes/mis-reportes")
+      .then((response) => {
+        if (active) setReports(response.reportes || []);
+      })
+      .catch((requestError) => {
+        console.error("No se pudieron cargar tus reportes.", requestError);
+        if (active) setError(requestError.message || "No se pudieron cargar tus reportes.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const filteredReports = reports.filter((report) => {
+    const status = String(report.estado || "").toLocaleLowerCase("es");
+    if (filter === "pendientes") return status.includes("pendiente");
+    if (filter === "en-proceso") return status.includes("proceso") || status.includes("curso");
+    if (filter === "resueltos") return status.includes("resuelt") || status.includes("cerrad");
+    return true;
+  });
+
+  const getStatusClass = (status) => {
+    const normalized = String(status || "").toLocaleLowerCase("es");
+    if (normalized.includes("resuelt") || normalized.includes("cerrad")) return "status-resolved";
+    if (normalized.includes("proceso") || normalized.includes("curso")) return "status-in-process";
+    return "status-pending";
+  };
 
   return (
     <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" user={user} onLogout={onLogout}>
@@ -460,14 +691,23 @@ function MyReports({ navigateTo, user, onLogout }) {
       </div>
 
       <div className="sac-reports-list">
-        {reports.map((item) => (
-          <div className="sac-report-card clickable" key={item.id} onClick={() => navigateTo("detalle-reporte")}>
-            <div className="sac-report-thumb">FOTO</div>
+        {loading && <p className="sac-admin-empty">Cargando tus reportes...</p>}
+        {error && <p className="error-message" role="alert">{error}</p>}
+        {!loading && !error && filteredReports.length === 0 && (
+          <p className="sac-admin-empty">No hay reportes para mostrar en este filtro.</p>
+        )}
+        {filteredReports.map((item) => (
+          <div className="sac-report-card clickable" key={item.id_reporte} onClick={() => navigateTo("detalle-reporte")}>
+            {item.foto
+              ? <img className="sac-report-thumb" src={item.foto} alt="" />
+              : <div className="sac-report-thumb">S.A.C.</div>}
             <div className="sac-report-info">
-              <h3>{item.title}</h3>
-              <p>{item.location} • {item.date}</p>
+              <h3>{item.titulo}</h3>
+              <p>{item.direccion} • {item.fecha_reporte ? new Date(item.fecha_reporte).toLocaleDateString("es-AR") : ""}</p>
+              {item.estado_revision === "pendiente" && <span className="sac-review-status pendiente">En revisión administrativa</span>}
+              {item.estado_revision === "rechazado" && <span className="sac-review-status rechazado">No aprobado para publicación</span>}
             </div>
-            <div className={`sac-status-badge ${item.statusClass}`}>{item.status}</div>
+            <div className={`sac-status-badge ${getStatusClass(item.estado)}`}>{item.estado}</div>
           </div>
         ))}
       </div>
@@ -477,39 +717,137 @@ function MyReports({ navigateTo, user, onLogout }) {
 
 /* Pantalla 6: Mapa */
 function MapScreen({ navigateTo, user, onLogout }) {
+  const [searchText, setSearchText] = useState("Benito Juárez, Buenos Aires, Argentina");
+  const [mapLocation, setMapLocation] = useState("Benito Juárez, Buenos Aires, Argentina");
+  const [selectedReportId, setSelectedReportId] = useState(null);
+  const [reports, setReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(true);
+  const [reportsError, setReportsError] = useState("");
+  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapLocation)}&z=16&output=embed`;
+  const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapLocation)}`;
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/reportes/todos")
+      .then((response) => {
+        if (active) setReports(response.reportes || []);
+      })
+      .catch((error) => {
+        console.error("No se pudieron cargar los reportes publicados.", error);
+        if (active) setReportsError(error.message || "No se pudieron cargar los reportes.");
+      })
+      .finally(() => {
+        if (active) setLoadingReports(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleSearch = (event) => {
+    event.preventDefault();
+    const location = searchText.trim();
+    if (location) {
+      setMapLocation(location);
+      setSelectedReportId(null);
+    }
+  };
+
+  const handleSelectReport = (report) => {
+    const hasCoordinates = report.latitud !== null
+      && report.latitud !== undefined
+      && report.longitud !== null
+      && report.longitud !== undefined;
+    const latitud = hasCoordinates ? Number(report.latitud) : NaN;
+    const longitud = hasCoordinates ? Number(report.longitud) : NaN;
+    const location = hasCoordinates && Number.isFinite(latitud) && Number.isFinite(longitud)
+      ? `${latitud},${longitud}`
+      : report.direccion || "Benito Juárez, Buenos Aires, Argentina";
+    setMapLocation(location);
+    setSearchText(report.direccion || location);
+    setSelectedReportId(report.id_reporte);
+  };
+
+  const getStatusClass = (status) => {
+    const normalized = String(status || "").toLocaleLowerCase("es");
+    if (normalized.includes("resuelt") || normalized.includes("cerrad")) return "status-resolved";
+    if (normalized.includes("proceso") || normalized.includes("curso")) return "status-in-process";
+    return "status-pending";
+  };
+
   return (
     <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
-      <p className="sac-page-subtitle">Explorá los reportes de tu zona</p>
+      <p className="sac-page-subtitle">Buscá una dirección o localidad y explorala directamente en Google Maps.</p>
 
-      <div className="sac-map-legend">
-        <div className="sac-legend-item"><span className="legend-dot red"></span><span>Pendiente</span></div>
-        <div className="sac-legend-item"><span className="legend-dot yellow"></span><span>En proceso</span></div>
-        <div className="sac-legend-item"><span className="legend-dot green"></span><span>Resuelto</span></div>
-      </div>
+      <form className="sac-map-search-form" onSubmit={handleSearch}>
+        <label className="sac-map-search-label" htmlFor="map-location">Ubicación</label>
+        <div className="sac-map-search-controls">
+          <input
+            id="map-location"
+            className="sac-map-search-input"
+            type="search"
+            value={searchText}
+            onChange={(event) => setSearchText(event.target.value)}
+            placeholder="Ej.: Calle 12 y 5, localidad"
+            aria-label="Buscar una dirección o localidad en el mapa"
+          />
+          <button className="sac-map-link sac-map-search-button" type="submit">Buscar en el mapa</button>
+        </div>
+      </form>
 
       <div className="sac-map-canvas">
-        <div className="sac-map-grid-overlay" />
-        <div className="sac-map-river" />
-        <div className="sac-map-pin red" style={{ top: '25%', left: '44%' }}>📍</div>
-        <div className="sac-map-pin red" style={{ top: '50%', left: '54%' }}>📍</div>
-        <div className="sac-map-pin red" style={{ top: '68%', left: '43%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '51%', left: '38%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '63%', left: '63%' }}>📍</div>
-        <div className="sac-map-pin yellow" style={{ top: '68%', left: '26%' }}>📍</div>
-        <div className="sac-map-pin green" style={{ top: '46%', left: '23%' }}>📍</div>
-        <div className="sac-map-pin green" style={{ top: '41%', left: '68%' }}>📍</div>
+        <iframe
+          className="sac-google-map"
+          src={mapEmbedUrl}
+          title={`Google Maps: ${mapLocation}`}
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          allowFullScreen
+        />
       </div>
 
-      <div className="sac-map-preview-card" onClick={() => navigateTo("detalle-reporte")}>
-        <div className="sac-report-thumb">FOTO</div>
-        <div className="sac-report-info">
-          <h3>Bache en la calle</h3>
-          <p>Calle 12 y 5 • 08/09/2026</p>
-          <span className="sac-status-badge status-in-process small-badge">En proceso</span>
+      <p className="sac-map-location-note">
+        Mapa disponible para todas las cuentas. También podés{" "}
+        <a className="sac-map-open-link" href={mapSearchUrl} target="_blank" rel="noreferrer">
+          abrir esta ubicación en Google Maps
+        </a>.
+      </p>
+
+      <section className="sac-map-reports-section" aria-labelledby="map-reports-title">
+        <div className="sac-map-reports-header">
+          <div>
+            <h2 id="map-reports-title">Reportes del barrio</h2>
+            <p>Seleccioná un reporte para ubicar su dirección en el mapa.</p>
+          </div>
+          <span className="sac-map-reports-count">{loadingReports ? "Cargando..." : `${reports.length} reportes`}</span>
         </div>
-        <div className="sac-map-preview-arrow">▶</div>
-      </div>
+
+        <div className="sac-map-reports-list">
+          {reportsError && <p className="error-message" role="alert">{reportsError}</p>}
+          {!loadingReports && !reportsError && reports.length === 0 && (
+            <p className="sac-admin-empty">Todavía no hay reportes aprobados para publicar.</p>
+          )}
+          {reports.map((report) => (
+            <button
+              className={`sac-map-report-item ${selectedReportId === report.id_reporte ? "selected" : ""}`}
+              key={report.id_reporte}
+              onClick={() => handleSelectReport(report)}
+              type="button"
+              aria-pressed={selectedReportId === report.id_reporte}
+            >
+              <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>
+              <span className="sac-map-report-details">
+                <strong>{report.titulo}</strong>
+                <span className="sac-map-report-location">{report.direccion || "Ubicación no informada"}</span>
+                <span className="sac-map-report-date">{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : ""}</span>
+              </span>
+              <span className={`sac-status-badge ${getStatusClass(report.estado)}`}>{report.estado}</span>
+            </button>
+          ))}
+        </div>
+      </section>
     </AppLayout>
   );
 }
@@ -595,31 +933,50 @@ function NotificationsScreen({ navigateTo, user, onLogout }) {
 /* Pantalla 9: Guía de uso */
 function GuiaUsoScreen({ navigateTo, user, onLogout }) {
   const pasos = [
-    { num: 1, icon: "pin", title: "1. Identificá el problema", desc: "Observá cualquier desperfecto o eventualidad en la vía pública (baches, alumbrado, basura, etc.)." },
-    { num: 2, icon: "camera", title: "2. Creá tu reporte", desc: "Ingresá a 'Reportar un problema', elegí la categoría adecuada, agregá una descripción detallada, la dirección exacta y adjuntá una foto." },
-    { num: 3, icon: "map", title: "3. Marcá la ubicación", desc: "Usá el botón de localización para guardar automáticamente las coordenadas del problema en el mapa del municipio." },
-    { num: 4, icon: "clipboard", title: "4. Hacé el seguimiento", desc: "Consultá el avance en 'Mis reportes' o enterate de cambios de estado (Pendiente, En proceso, Resuelto) desde 'Notificaciones'." },
-    { num: 5, icon: "heart", title: "5. Apoyá reportes de vecinos", desc: "Explorá el 'Mapa' de tu barrio y apoyá las incidencias de otros vecinos para darles más visibilidad ante el municipio." }
+    { num: 1, icon: "pin", title: "Identificá el problema", desc: "Observá cualquier desperfecto o eventualidad en la vía pública como baches, alumbrado, basura o falta de señalización." },
+    { num: 2, icon: "camera", title: "Creá tu reporte", desc: "Ingresá a Reportar un problema, elegí la categoría adecuada y escribí una descripción clara con detalles útiles." },
+    { num: 3, icon: "map", title: "Marcá la ubicación", desc: "Usá el mapa o la dirección para registrar exactamente dónde está el problema para que pueda ser atendido." },
+    { num: 4, icon: "clipboard", title: "Hacé seguimiento", desc: "Consultá el avance de cada caso en Mis reportes y enterate del estado desde Notificaciones." },
+    { num: 5, icon: "heart", title: "Apoyá la comunidad", desc: "Visitá el Mapa y apoyá reportes de otros vecinos para que el problema tenga más visibilidad." }
   ];
 
   return (
     <AppLayout activeNav="guia" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Guía de uso</h1>
-      <p className="sac-page-subtitle">Aprende a sacar el máximo provecho del Sistema de Atención Ciudadana</p>
+      <div className="sac-guide-page-heading">
+        <span className="sac-guide-eyebrow">CENTRO DE AYUDA</span>
+        <h1 className="sac-page-title">Guía de uso</h1>
+        <p className="sac-page-subtitle">Una guía simple para reportar y hacer seguimiento de los problemas del barrio.</p>
+      </div>
 
       <div className="sac-guide-hero">
-        <div className="sac-guide-hero-icon"><Icon type="book" size={32} /></div>
-        <div>
+        <div className="sac-guide-hero-copy">
+          <span className="sac-guide-hero-icon"><Icon type="book" size={25} /></span>
+          <div>
+            <span className="sac-guide-hero-label">S.A.C. · Sistema de Atención Ciudadana</span>
           <h2>¿Cómo funciona el S.A.C.?</h2>
-          <p>Esta plataforma está diseñada para que puedas reportar incidencias en tu barrio de forma rápida y sencilla.</p>
+          <p>Esta plataforma te permite reportar incidencias del barrio de forma simple, ordenada y visible para la comunidad.</p>
+          </div>
+        </div>
+        <div className="sac-guide-hero-aside">
+          <strong>5 pasos</strong>
+          <span>para completar tu reporte</span>
         </div>
       </div>
 
       <div className="sac-guide-steps-list">
+        <div className="sac-guide-section-heading">
+          <div>
+            <span className="sac-guide-eyebrow">EMPEZÁ ACÁ</span>
+            <h2>De la observación al seguimiento</h2>
+          </div>
+          <p>Seguí estos pasos para que tu aviso llegue con toda la información necesaria.</p>
+        </div>
         {pasos.map((step) => (
           <div className="sac-guide-step-card" key={step.num}>
-            <div className="sac-guide-step-number">{step.num}</div>
-            <div className="sac-guide-step-icon"><Icon type={step.icon} size={22} /></div>
+            <div className="sac-guide-step-marker">
+              <span className="sac-guide-step-number">{step.num}</span>
+            </div>
+            <span className="sac-guide-step-icon"><Icon type={step.icon} size={19} /></span>
             <div className="sac-guide-step-content">
               <h3>{step.title}</h3>
               <p>{step.desc}</p>
@@ -629,8 +986,9 @@ function GuiaUsoScreen({ navigateTo, user, onLogout }) {
       </div>
 
       <div className="sac-guide-footer-card">
-        <div>
-          <h3>¿Tenés un problema para reportar ahora?</h3>
+        <span className="sac-guide-footer-icon"><Icon type="megaphone" size={22} /></span>
+        <div className="sac-guide-footer-copy">
+          <h3>¿Necesitás reportar un problema ahora?</h3>
           <p>Sumá tu aporte y ayudá a construir un vecindario mejor.</p>
         </div>
         <button className="sac-primary-btn sac-guide-cta-btn" onClick={() => navigateTo("reportar-form")} type="button">
@@ -649,10 +1007,42 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
   const [email, setEmail] = useState(user?.email || "aisha@gmail.com");
   const [foto, setFoto] = useState(user?.foto || null);
   const [successMsg, setSuccessMsg] = useState("");
+  const [profileError, setProfileError] = useState("");
 
-  const handleSaveProfile = (e) => {
+  useEffect(() => {
+    setNombre(user?.nombre || "Aisha");
+    setApellido(user?.apellido || "Gomez");
+    setEmail(user?.email || "aisha@gmail.com");
+    setFoto(user?.foto || null);
+  }, [user]);
+
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    const updated = { ...user, nombre, apellido, email, foto };
+    setProfileError("");
+    const updated = {
+      ...user,
+      nombre: nombre.trim(),
+      apellido: apellido.trim(),
+      email: email.trim(),
+      foto
+    };
+
+    try {
+      await apiFetch("/perfil/editar", {
+        method: "PUT",
+        body: JSON.stringify({
+          nombre: updated.nombre,
+          apellido: updated.apellido,
+          email: updated.email
+        })
+      });
+      localStorage.setItem("sac_user", JSON.stringify(updated));
+    } catch (error) {
+      console.error("No se pudo actualizar el perfil.", error);
+      setProfileError(error.message || "No se pudieron guardar los cambios. Intentá nuevamente.");
+      return;
+    }
+
     setUser(updated);
     setIsEditing(false);
     setSuccessMsg("¡Perfil actualizado con éxito!");
@@ -676,12 +1066,13 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
       <p className="sac-page-subtitle">Administrá tu información y preferencias</p>
 
       {successMsg && <p className="success-message">{successMsg}</p>}
+      {profileError && <p className="error-message" role="alert">{profileError}</p>}
 
       {!isEditing ? (
         <>
           <div className="sac-profile-card-header">
             <div className="sac-profile-avatar-large">
-              {foto ? <img src={foto} alt="Avatar" className="sac-avatar-img" /> : <span>👤</span>}
+              {foto ? <img src={foto} alt="Avatar" className="sac-avatar-img" /> : <span><Icon type="user" size={26} /></span>}
             </div>
             <div>
               <h2>{nombre} {apellido}</h2>
@@ -691,27 +1082,27 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
 
           <div className="sac-profile-menu-list">
             <button className="sac-profile-menu-item" onClick={() => setIsEditing(true)} type="button">
-              <span className="p-icon">✏️</span>
+              <span className="p-icon"><Icon type="user" size={16} /></span>
               <span>Editar perfil</span>
               <span className="p-arrow">›</span>
             </button>
             <button className="sac-profile-menu-item" onClick={() => navigateTo("cambiar-contrasena")} type="button">
-              <span className="p-icon">🔒</span>
+              <span className="p-icon"><Icon type="lock" size={16} /></span>
               <span>Cambiar contraseña</span>
               <span className="p-arrow">›</span>
             </button>
             <button className="sac-profile-menu-item" onClick={() => navigateTo("mis-reportes")} type="button">
-              <span className="p-icon">📄</span>
+              <span className="p-icon"><Icon type="file" size={16} /></span>
               <span>Mis reportes</span>
               <span className="p-arrow">›</span>
             </button>
             <button className="sac-profile-menu-item" onClick={() => navigateTo("notificaciones")} type="button">
-              <span className="p-icon">🔔</span>
+              <span className="p-icon"><Icon type="bell" size={16} /></span>
               <span>Notificaciones</span>
               <span className="p-arrow">›</span>
             </button>
             <button className="sac-profile-menu-item" type="button">
-              <span className="p-icon">📞</span>
+              <span className="p-icon"><Icon type="phone" size={16} /></span>
               <span>Contacto</span>
               <span className="p-arrow">›</span>
             </button>
@@ -720,8 +1111,18 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
       ) : (
         <form className="sac-form-container" onSubmit={handleSaveProfile}>
           <div className="sac-form-group">
-            <label className="sac-label">Foto de perfil</label>
-            <input type="file" accept="image/*" onChange={handlePhotoChange} className="sac-input" />
+            <label className="sac-label" htmlFor="perfil-foto">Foto de perfil</label>
+            <input id="perfil-foto" type="file" accept="image/*" onChange={handlePhotoChange} className="sac-file-input" />
+            <label className="sac-profile-upload" htmlFor="perfil-foto">
+              <span className="sac-profile-upload-preview">
+                {foto ? <img src={foto} alt="" /> : <Icon type="user" size={22} />}
+              </span>
+              <span className="sac-upload-copy">
+                <strong>{foto ? "Foto seleccionada" : "Agregá una foto de perfil"}</strong>
+                <small>Elegí una imagen desde tu dispositivo</small>
+              </span>
+              <span className="sac-upload-action">{foto ? "Cambiar" : "Elegir foto"}</span>
+            </label>
           </div>
           <div className="sac-form-group">
             <label className="sac-label">Nombre</label>
@@ -829,10 +1230,325 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
   );
 }
 
+function AdminScreen({ navigateTo, user, onLogout }) {
+  const [reportes, setReportes] = useState([]);
+  const [usuarios, setUsuarios] = useState([]);
+  const [estados, setEstados] = useState([]);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("todos");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [updatingReportId, setUpdatingReportId] = useState(null);
+  const [deletingRecord, setDeletingRecord] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAdminData = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [reportsResponse, usersResponse, statesResponse] = await Promise.all([
+          apiFetch("/admin/reportes"),
+          apiFetch("/admin/usuarios"),
+          apiFetch("/admin/estados")
+        ]);
+        if (!active) return;
+        setReportes(reportsResponse.reportes || []);
+        setUsuarios(usersResponse.usuarios || []);
+        setEstados(statesResponse.estados || []);
+      } catch (requestError) {
+        console.error("No se pudieron cargar los datos de administración.", requestError);
+        if (active) setError(requestError.message || "No se pudieron cargar los datos reales.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadAdminData();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const normalizeStatus = (status) => String(status || "").trim().toLocaleLowerCase("es");
+  const pendingCount = reportes.filter((report) => normalizeStatus(report.estado).includes("pendiente")).length;
+  const inProgressCount = reportes.filter((report) => {
+    const status = normalizeStatus(report.estado);
+    return status.includes("proceso") || status.includes("curso");
+  }).length;
+  const resolvedCount = reportes.filter((report) => {
+    const status = normalizeStatus(report.estado);
+    return status.includes("resuelt") || status.includes("cerrad") || status.includes("completad");
+  }).length;
+  const approvalCount = reportes.filter((report) => report.estado_revision === "pendiente").length;
+  const stats = [
+    { label: "Reportes totales", value: reportes.length, detail: "Total registrado" },
+    { label: "Por autorizar", value: approvalCount, detail: "Esperan decisión administrativa" },
+    { label: "Pendientes", value: pendingCount, detail: "Según estado actual" },
+    { label: "En proceso", value: inProgressCount, detail: "Según estado actual" },
+    { label: "Resueltos", value: resolvedCount, detail: "Según estado actual" },
+    { label: "Usuarios registrados", value: usuarios.length, detail: "Total de cuentas" }
+  ];
+
+  const filteredReports = reportes.filter((report) => {
+    const searchable = `${report.id_reporte} ${report.titulo} ${report.direccion} ${report.vecino} ${report.estado}`.toLocaleLowerCase("es");
+    const matchesSearch = searchable.includes(search.toLocaleLowerCase("es"));
+    const status = normalizeStatus(report.estado);
+    const matchesFilter = filter === "todos"
+      || (filter === "pendientes" && status.includes("pendiente"))
+      || (filter === "proceso" && (status.includes("proceso") || status.includes("curso")))
+      || (filter === "resueltos" && (status.includes("resuelt") || status.includes("cerrad") || status.includes("completad")));
+    return matchesSearch && matchesFilter;
+  });
+
+  const handleStatusChange = async (reportId, estadoId) => {
+    setError("");
+    setUpdatingReportId(reportId);
+    try {
+      await apiFetch(`/admin/reportes/${reportId}/estado`, {
+        method: "PUT",
+        body: JSON.stringify({ id_estado: Number(estadoId) })
+      });
+      const newStatus = estados.find((state) => String(state.id_estado) === String(estadoId));
+      if (newStatus) {
+        setReportes((current) => current.map((report) => (
+          report.id_reporte === reportId ? { ...report, estado: newStatus.nombre } : report
+        )));
+      }
+    } catch (requestError) {
+      console.error(`No se pudo actualizar el estado del reporte ${reportId}.`, requestError);
+      setError(requestError.message || "No se pudo actualizar el estado del reporte.");
+    } finally {
+      setUpdatingReportId(null);
+    }
+  };
+
+  const handleApproval = async (reportId, decision) => {
+    setError("");
+    setUpdatingReportId(reportId);
+    try {
+      await apiFetch(`/admin/reportes/${reportId}/aprobacion`, {
+        method: "PUT",
+        body: JSON.stringify({ decision })
+      });
+      setReportes((current) => current.map((report) => (
+        report.id_reporte === reportId
+          ? { ...report, estado_revision: decision }
+          : report
+      )));
+    } catch (requestError) {
+      console.error(`No se pudo guardar la decisión del reporte ${reportId}.`, requestError);
+      setError(requestError.message || "No se pudo guardar la decisión del reporte.");
+    } finally {
+      setUpdatingReportId(null);
+    }
+  };
+
+  const handleDeleteReport = async (report) => {
+    if (!window.confirm(`¿Eliminar el reporte “${report.titulo}” y sus comentarios y apoyos? Esta acción no se puede deshacer.`)) return;
+
+    setError("");
+    setDeletingRecord(`reporte-${report.id_reporte}`);
+    try {
+      await apiFetch(`/admin/reportes/${report.id_reporte}`, { method: "DELETE" });
+      setReportes((current) => current.filter((item) => item.id_reporte !== report.id_reporte));
+    } catch (requestError) {
+      console.error(`No se pudo eliminar el reporte ${report.id_reporte}.`, requestError);
+      setError(requestError.message || "No se pudo eliminar el reporte.");
+    } finally {
+      setDeletingRecord("");
+    }
+  };
+
+  const handleDeleteUser = async (registeredUser) => {
+    const userName = `${registeredUser.nombre || ""} ${registeredUser.apellido || ""}`.trim() || registeredUser.email;
+    if (!window.confirm(`¿Eliminar a ${userName}, todos sus reportes, comentarios y apoyos? Esta acción no se puede deshacer.`)) return;
+
+    setError("");
+    setDeletingRecord(`usuario-${registeredUser.id_usuario}`);
+    try {
+      await apiFetch(`/admin/usuarios/${registeredUser.id_usuario}`, { method: "DELETE" });
+      setUsuarios((current) => current.filter((item) => item.id_usuario !== registeredUser.id_usuario));
+      setReportes((current) => current.filter((item) => item.id_usuario !== registeredUser.id_usuario));
+    } catch (requestError) {
+      console.error(`No se pudo eliminar el usuario ${registeredUser.id_usuario}.`, requestError);
+      setError(requestError.message || "No se pudo eliminar el usuario.");
+    } finally {
+      setDeletingRecord("");
+    }
+  };
+
+  return (
+    <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="10" user={user} onLogout={onLogout}>
+      <div className="sac-admin-section">
+        <div className="sac-admin-header">
+          <div>
+            <span className="sac-admin-eyebrow">Panel administrativo</span>
+            <h1 className="sac-page-title">Administración</h1>
+          </div>
+          <div className="sac-admin-role"><Icon type="wrench" size={15} /> Administrador</div>
+        </div>
+      </div>
+
+      <div className="sac-admin-stats">
+        {stats.map((stat) => (
+          <div className="sac-admin-stat" key={stat.label}>
+            <span>{stat.label}</span>
+            <strong>{loading ? "—" : stat.value}</strong>
+            <small>{stat.detail}</small>
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="error-message" role="alert">{error}</p>}
+
+      <div className="sac-admin-section">
+        <div className="sac-admin-section-header">
+          <div>
+            <h2>Reportes recientes</h2>
+            <p>Datos y estados obtenidos del sistema</p>
+          </div>
+          <div className="sac-admin-report-tools">
+            <label className="sac-admin-search">
+              <Icon type="map" size={14} />
+              <input
+                type="search"
+                placeholder="Buscar reporte"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <select className="sac-admin-filter" value={filter} onChange={(event) => setFilter(event.target.value)}>
+              <option value="todos">Todos</option>
+              <option value="pendientes">Pendientes</option>
+              <option value="proceso">En proceso</option>
+              <option value="resueltos">Resueltos</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="sac-admin-list">
+          {loading && <p className="sac-admin-empty">Cargando datos de administración...</p>}
+          {!loading && filteredReports.length === 0 && (
+            <p className="sac-admin-empty">No hay reportes que coincidan con la búsqueda.</p>
+          )}
+          {filteredReports.map((report) => {
+            const currentState = estados.find((state) => state.nombre === report.estado);
+            return (
+              <div className="sac-admin-row" key={report.id_reporte}>
+                <div>
+                  <strong>#{report.id_reporte} · {report.titulo}</strong>
+                  <span>{report.direccion || "Ubicación no informada"} · {report.vecino || "Vecino"}</span>
+                  <span>{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : "Fecha no disponible"}</span>
+                  {report.descripcion && <span>{report.descripcion}</span>}
+                  <span className={`sac-review-status ${report.estado_revision}`}>
+                    Revisión: {report.estado_revision === "aprobado" ? "Aprobado" : report.estado_revision === "rechazado" ? "Rechazado" : "Pendiente"}
+                  </span>
+                </div>
+                <div className="sac-admin-control">
+                  {report.estado_revision === "pendiente" && (
+                    <div className="sac-admin-approval-actions">
+                      <button
+                        className="sac-approval-btn approve"
+                        type="button"
+                        onClick={() => handleApproval(report.id_reporte, "aprobado")}
+                        disabled={updatingReportId === report.id_reporte || Boolean(deletingRecord)}
+                      >
+                        Aprobar y publicar
+                      </button>
+                      <button
+                        className="sac-approval-btn reject"
+                        type="button"
+                        onClick={() => handleApproval(report.id_reporte, "rechazado")}
+                        disabled={updatingReportId === report.id_reporte || Boolean(deletingRecord)}
+                      >
+                        Rechazar
+                      </button>
+                    </div>
+                  )}
+                  <select
+                    className="sac-select"
+                    value={currentState?.id_estado || ""}
+                    onChange={(event) => handleStatusChange(report.id_reporte, event.target.value)}
+                    disabled={updatingReportId === report.id_reporte || Boolean(deletingRecord) || estados.length === 0}
+                    aria-label={`Cambiar estado del reporte ${report.id_reporte}`}
+                  >
+                    {currentState && <option value={currentState.id_estado}>{currentState.nombre}</option>}
+                    {estados.filter((state) => state.id_estado !== currentState?.id_estado).map((state) => (
+                      <option key={state.id_estado} value={state.id_estado}>{state.nombre}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="sac-delete-btn"
+                    type="button"
+                    onClick={() => handleDeleteReport(report)}
+                    disabled={Boolean(deletingRecord)}
+                  >
+                    {deletingRecord === `reporte-${report.id_reporte}` ? "Eliminando..." : "Eliminar reporte"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="sac-admin-section sac-admin-users-section">
+        <div className="sac-admin-section-header">
+          <div>
+            <h2>Registro de usuarios</h2>
+            <p>Listado completo de cuentas registradas</p>
+          </div>
+          <span className="sac-map-reports-count">{loading ? "Cargando..." : `${usuarios.length} usuarios`}</span>
+        </div>
+        <div className="sac-admin-users-list">
+          {!loading && usuarios.length === 0 && (
+            <p className="sac-admin-empty">No hay usuarios registrados.</p>
+          )}
+          {usuarios.map((registeredUser) => (
+            <div className="sac-admin-user-row" key={registeredUser.id_usuario}>
+              <span className="sac-user-avatar"><Icon type="user" size={17} /></span>
+              <span className="sac-admin-user-details">
+                <strong>{`${registeredUser.nombre || ""} ${registeredUser.apellido || ""}`.trim() || "Sin nombre"}</strong>
+                <span>{registeredUser.email}</span>
+              </span>
+              <span className="sac-admin-user-role">{registeredUser.rol}</span>
+              <span className="sac-admin-user-date">
+                {registeredUser.fecha_registro ? new Date(registeredUser.fecha_registro).toLocaleDateString("es-AR") : "Fecha no disponible"}
+              </span>
+              <button
+                className="sac-delete-btn"
+                type="button"
+                onClick={() => handleDeleteUser(registeredUser)}
+                disabled={Boolean(deletingRecord) || String(registeredUser.id_usuario) === String(user?.id_usuario)}
+                title={String(registeredUser.id_usuario) === String(user?.id_usuario) ? "No podés eliminar tu propia cuenta" : "Eliminar usuario y sus datos asociados"}
+              >
+                {deletingRecord === `usuario-${registeredUser.id_usuario}` ? "Eliminando..." : "Eliminar"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
 /* Componente Principal App */
 export default function App() {
-  const [screen, setScreen] = useState("login");
-  const [user, setUser] = useState({ nombre: "Aisha", apellido: "Gomez", email: "aisha@gmail.com", foto: null });
+  const [initialSession] = useState(() => getStoredSession());
+  const [screen, setScreen] = useState(initialSession ? "home" : "login");
+  const [user, setUser] = useState({
+    ...(initialSession?.user || {
+      nombre: "Aisha",
+      apellido: "Gomez",
+      email: "aisha@gmail.com",
+      foto: null,
+      rol: "administrador"
+    })
+  });
+  const [sessionExpiresAt, setSessionExpiresAt] = useState(initialSession?.expiresAt || null);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -846,30 +1562,123 @@ export default function App() {
     contrasena: ""
   });
 
-  const handleLoginSubmit = () => {
+  useEffect(() => {
+    if (!sessionExpiresAt) return undefined;
+
+    let timeoutId;
+    const expireSession = () => {
+      const remaining = sessionExpiresAt - Date.now();
+      if (remaining > 0) {
+        timeoutId = window.setTimeout(expireSession, Math.min(remaining, 2147483647));
+        return;
+      }
+
+      clearStoredSession();
+      setSessionExpiresAt(null);
+      setScreen("login");
+      setErrorMessage("Tu sesión venció. Iniciá sesión nuevamente.");
+    };
+
+    timeoutId = window.setTimeout(
+      expireSession,
+      Math.min(sessionExpiresAt - Date.now(), 2147483647)
+    );
+    return () => window.clearTimeout(timeoutId);
+  }, [sessionExpiresAt]);
+
+  useEffect(() => {
+    if (!initialSession) return undefined;
+
+    let active = true;
+    const refreshUser = async () => {
+      try {
+        const response = await apiFetch("/auth/usuario");
+        if (active && response.usuario) setUser(response.usuario);
+      } catch (error) {
+        if (!active) return;
+        console.error("No se pudo actualizar el usuario de la sesión.", error);
+        if (error.status === 401) {
+          clearStoredSession();
+          setSessionExpiresAt(null);
+          setScreen("login");
+          setErrorMessage("Tu sesión venció o dejó de ser válida. Iniciá sesión nuevamente.");
+        }
+      }
+    };
+
+    refreshUser();
+    return () => {
+      active = false;
+    };
+  }, [initialSession]);
+
+  useEffect(() => {
+    if (sessionExpiresAt && sessionExpiresAt > Date.now()) {
+      localStorage.setItem("sac_user", JSON.stringify(user));
+      localStorage.setItem("sac_session_expires_at", String(sessionExpiresAt));
+    }
+  }, [user, sessionExpiresAt]);
+
+  const handleLoginSubmit = async () => {
     setSubmitting(true);
     setErrorMessage("");
-    setTimeout(() => {
-      setUser((prev) => ({ ...prev, email: loginForm.email || prev.email }));
-      setSubmitting(false);
+
+    try {
+      const response = await apiFetch("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: loginForm.email,
+          contrasena: loginForm.password
+        })
+      });
+
+      if (!response.token || !response.usuario) {
+        throw new Error("El servidor no devolvió los datos de inicio de sesión.");
+      }
+
+      localStorage.setItem("sac_token", response.token);
+      setUser(response.usuario);
+      setSessionExpiresAt(Date.now() + SESSION_DURATION_MS);
       setScreen("home");
-    }, 500);
+    } catch (error) {
+      console.error("No se pudo iniciar sesión.", error);
+      setErrorMessage(error.message || "No se pudo iniciar sesión. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleRegisterSubmit = () => {
+  const handleRegisterSubmit = async () => {
     setSubmitting(true);
     setErrorMessage("");
-    setTimeout(() => {
-      setSuccessMessage("¡Cuenta creada con éxito!");
-      setSubmitting(false);
+
+    try {
+      const response = await apiFetch("/auth/registro", {
+        method: "POST",
+        body: JSON.stringify({
+          nombre: registerForm.nombre,
+          apellido: registerForm.apellido,
+          email: registerForm.email,
+          contrasena: registerForm.contrasena
+        })
+      });
+      setSuccessMessage(response.mensaje || "¡Cuenta creada con éxito!");
+      setLoginForm((previous) => ({ ...previous, email: registerForm.email, password: "" }));
       setTimeout(() => {
         setScreen("login");
         setSuccessMessage("");
       }, 1000);
-    }, 500);
+    } catch (error) {
+      console.error("No se pudo registrar la cuenta.", error);
+      setErrorMessage(error.message || "No se pudo crear la cuenta. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleLogout = () => {
+    clearStoredSession();
+    setSessionExpiresAt(null);
     setScreen("login");
   };
 
@@ -909,6 +1718,12 @@ export default function App() {
   if (screen === "guia-uso") return <GuiaUsoScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "perfil") return <ProfileScreen navigateTo={setScreen} user={user} setUser={setUser} onLogout={handleLogout} />;
   if (screen === "cambiar-contrasena") return <ChangePasswordScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "admin") {
+    if (isAdministrator(user)) {
+      return <AdminScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+    }
+    return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
 
   return (
     <Login

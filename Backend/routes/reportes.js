@@ -51,7 +51,7 @@ router.post(
     verificarToken,
     subirFoto.single("foto"),
     async (req, res) => {
-
+        let connection;
         try {
 
             const {
@@ -83,8 +83,11 @@ router.post(
                     `/uploads/reportes/${req.file.filename}`;
             }
 
+            connection = await conexion.getConnection();
+            await connection.beginTransaction();
+
             const [resultado] =
-                await conexion.query(
+                await connection.query(
                     `INSERT INTO reportes
                     (
                         id_usuario,
@@ -110,15 +113,24 @@ router.post(
                     ]
                 );
 
+            await connection.query(
+                `INSERT INTO aprobaciones_reportes
+                (id_reporte, estado_revision)
+                VALUES (?, 'pendiente')`,
+                [resultado.insertId]
+            );
+            await connection.commit();
+
             res.status(201).json({
                 ok: true,
                 mensaje:
-                    "Reporte creado correctamente",
+                    "Reporte enviado. Quedó pendiente de autorización administrativa.",
                 id_reporte:
                     resultado.insertId
             });
 
         } catch (error) {
+            if (connection) await connection.rollback();
 
             console.error(error);
 
@@ -126,6 +138,8 @@ router.post(
                 ok: false,
                 mensaje: "Error al crear el reporte"
             });
+        } finally {
+            if (connection) connection.release();
         }
     }
 );
@@ -172,6 +186,10 @@ router.get(
                         ) AS apoyos
 
                     FROM reportes r
+
+                    INNER JOIN aprobaciones_reportes ar
+                        ON ar.id_reporte = r.id_reporte
+                        AND ar.estado_revision = 'aprobado'
 
                     INNER JOIN categorias c
                         ON r.id_categoria =
@@ -232,6 +250,7 @@ router.get(
                         r.fecha_reporte,
                         c.nombre AS categoria,
                         e.nombre AS estado,
+                        COALESCE(ar.estado_revision, 'pendiente') AS estado_revision,
 
                         (
                             SELECT COUNT(*)
@@ -241,6 +260,9 @@ router.get(
                         ) AS apoyos
 
                     FROM reportes r
+
+                    LEFT JOIN aprobaciones_reportes ar
+                        ON ar.id_reporte = r.id_reporte
 
                     INNER JOIN categorias c
                         ON r.id_categoria =
