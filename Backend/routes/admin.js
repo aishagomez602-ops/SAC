@@ -8,6 +8,7 @@ const {
     verificarToken,
     verificarAdministrador
 } = require("../middleware/auth");
+const { actualizarEstadoReporte } = require("../services/report-status");
 
 const router = express.Router();
 
@@ -386,6 +387,36 @@ router.get(
     }
 );
 
+router.get(
+    "/contacto",
+    verificarToken,
+    verificarAdministrador,
+    async (req, res) => {
+        try {
+            const [consultas] = await conexion.query(
+                `SELECT
+                    c.id_contacto,
+                    c.asunto,
+                    c.mensaje,
+                    c.fecha_contacto,
+                    CONCAT(u.nombre, ' ', u.apellido) AS usuario,
+                    u.email
+                 FROM contacto c
+                 INNER JOIN usuarios u ON u.id_usuario = c.id_usuario
+                 ORDER BY c.fecha_contacto DESC`
+            );
+
+            return res.json({ ok: true, consultas });
+        } catch (error) {
+            console.error(error);
+            return res.status(500).json({
+                ok: false,
+                mensaje: "No se pudieron obtener las consultas de contacto"
+            });
+        }
+    }
+);
+
 
 // ========================================
 // CAMBIAR ROL
@@ -406,7 +437,7 @@ router.put(
             });
         }
 
-        if (rol !== "vecino" && rol !== "administrador") {
+        if (!["vecino", "administrador", "area_municipal"].includes(rol)) {
             return res.status(400).json({
                 ok: false,
                 mensaje: "Rol inválido"
@@ -485,101 +516,20 @@ router.put(
     verificarToken,
     verificarAdministrador,
     async (req, res) => {
-
         try {
-
-            const idReporte =
-                req.params.id;
-
-            const { id_estado } =
-                req.body;
-
-            if (!id_estado) {
-
-                return res.status(400).json({
-                    ok: false,
-                    mensaje:
-                        "Falta seleccionar el estado"
-                });
-            }
-
-            const [reportes] =
-                await conexion.query(
-                    `SELECT id_usuario
-                     FROM reportes
-                     WHERE id_reporte = ?`,
-                    [idReporte]
-                );
-
-            if (reportes.length === 0) {
-
-                return res.status(404).json({
-                    ok: false,
-                    mensaje:
-                        "Reporte no encontrado"
-                });
-            }
-
-            const [estados] =
-                await conexion.query(
-                    `SELECT nombre
-                     FROM estados
-                     WHERE id_estado = ?`,
-                    [id_estado]
-                );
-
-            if (estados.length === 0) {
-
-                return res.status(400).json({
-                    ok: false,
-                    mensaje:
-                        "Estado inválido"
-                });
-            }
-
-            await conexion.query(
-                `UPDATE reportes
-                 SET id_estado = ?
-                 WHERE id_reporte = ?`,
-                [
-                    id_estado,
-                    idReporte
-                ]
-            );
-
-            const mensaje =
-                `Tu reporte ahora está en estado: ${estados[0].nombre}`;
-
-            await conexion.query(
-                `INSERT INTO notificaciones
-                (
-                    id_usuario,
-                    id_reporte,
-                    tipo,
-                    mensaje
-                )
-                VALUES (?, ?, 'estado', ?)`,
-                [
-                    reportes[0].id_usuario,
-                    idReporte,
-                    mensaje
-                ]
-            );
-
-            res.json({
+            const estado = await actualizarEstadoReporte(req.params.id, req.body.id_estado);
+            return res.json({
                 ok: true,
-                mensaje:
-                    "Estado actualizado correctamente"
+                mensaje: `Estado actualizado correctamente: ${estado.nombre}`
             });
-
         } catch (error) {
-
+            if (error.status) {
+                return res.status(error.status).json({ ok: false, mensaje: error.message });
+            }
             console.error(error);
-
-            res.status(500).json({
+            return res.status(500).json({
                 ok: false,
-                mensaje:
-                    "No se pudo actualizar el estado"
+                mensaje: "No se pudo actualizar el estado"
             });
         }
     }

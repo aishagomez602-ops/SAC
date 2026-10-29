@@ -4,7 +4,7 @@ const express = require("express");
 const cors = require("cors");
 
 const app = express();
-const DEFAULT_PORT = Number(process.env.PORT) || 3002;
+const DEFAULT_PORT = Number(process.env.SAC_API_PORT) || Number(process.env.PORT) || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -22,8 +22,10 @@ app.get("/", (req, res) => {
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/categorias", require("./routes/categorias"));
 app.use("/api/perfil", require("./routes/perfil"));
+app.use("/api/contacto", require("./routes/contacto"));
 app.use("/api/notificaciones", require("./routes/notificaciones"));
 app.use("/api/reportes", require("./routes/reportes"));
+app.use("/api/municipal", require("./routes/areaMunicipal"));
 app.use("/api/admin", require("./routes/admin"));
 
 app.use((err, req, res, next) => {
@@ -40,7 +42,7 @@ function iniciarServidor(port) {
   });
 
   server.on("error", (error) => {
-    if (error.code === "EADDRINUSE" && port === DEFAULT_PORT) {
+    if (!process.env.SAC_API_PORT && error.code === "EADDRINUSE" && port === DEFAULT_PORT) {
       console.warn(`Puerto ${port} ocupado. Reintentando en ${port + 1}...`);
       iniciarServidor(port + 1);
       return;

@@ -1,42 +1,53 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 const API_URL = "/api";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 function clearStoredSession() {
-  localStorage.removeItem("sac_user");
-  localStorage.removeItem("sac_token");
-  localStorage.removeItem("sac_session_expires_at");
+  for (const storage of [localStorage, sessionStorage]) {
+    storage.removeItem("sac_user");
+    storage.removeItem("sac_token");
+    storage.removeItem("sac_session_expires_at");
+  }
+}
+
+function clearSession(storage) {
+  storage.removeItem("sac_user");
+  storage.removeItem("sac_token");
+  storage.removeItem("sac_session_expires_at");
+}
+
+function getSessionStorage() {
+  return localStorage.getItem("sac_token") ? localStorage : sessionStorage;
 }
 
 function getStoredSession() {
-  const serializedUser = localStorage.getItem("sac_user");
-  const token = localStorage.getItem("sac_token");
-  if (!serializedUser || !token) {
-    if (serializedUser || localStorage.getItem("sac_session_expires_at")) clearStoredSession();
-    return null;
+  for (const [storage, remember] of [[localStorage, true], [sessionStorage, false]]) {
+    const serializedUser = storage.getItem("sac_user");
+    const token = storage.getItem("sac_token");
+    const expiresAt = Number(storage.getItem("sac_session_expires_at"));
+    if (!serializedUser || !token || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      if (serializedUser || token || storage.getItem("sac_session_expires_at")) clearSession(storage);
+      continue;
+    }
+
+    try {
+      const user = JSON.parse(serializedUser);
+      if (user && typeof user === "object" && Number.isFinite(expiresAt) && expiresAt > Date.now()) {
+        return { user, expiresAt, remember };
+      }
+    } catch {
+      clearSession(storage);
+    }
+    clearSession(storage);
   }
 
-  let user;
-  try {
-    user = JSON.parse(serializedUser);
-  } catch {
-    clearStoredSession();
-    return null;
-  }
-
-  const expiresAt = Number(localStorage.getItem("sac_session_expires_at"));
-  if (!user || typeof user !== "object" || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
-    clearStoredSession();
-    return null;
-  }
-
-  return { user, expiresAt };
+  return null;
 }
 
 async function apiFetch(endpoint, options = {}) {
-  const token = localStorage.getItem("sac_token");
+  const token = localStorage.getItem("sac_token") || sessionStorage.getItem("sac_token");
   const { headers: customHeaders, ...fetchOptions } = options;
   const headers = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -132,6 +143,31 @@ function getReportPhotoUrl(photo) {
   return `/${photo.replace(/^\/+/, "")}`;
 }
 
+function getReportLocation(report) {
+  const latitud = Number(report.latitud);
+  const longitud = Number(report.longitud);
+  const hasCoordinates = report.latitud !== null
+    && report.latitud !== undefined
+    && report.longitud !== null
+    && report.longitud !== undefined
+    && Number.isFinite(latitud)
+    && Number.isFinite(longitud)
+    && latitud >= -90
+    && latitud <= 90
+    && longitud >= -180
+    && longitud <= 180;
+
+  if (hasCoordinates) {
+    return { query: `${latitud},${longitud}`, exact: true };
+  }
+
+  const address = String(report.direccion || "").trim();
+  return {
+    query: address ? `${address}, Benito Juárez, Buenos Aires, Argentina` : "Benito Juárez, Buenos Aires, Argentina",
+    exact: false
+  };
+}
+
 function ReportPhoto({ photo, className, alt }) {
   const [failed, setFailed] = useState(false);
   const src = getReportPhotoUrl(photo);
@@ -171,7 +207,7 @@ function CityIllustration() {
   return <p>ciudad</p>;
 }
 
-function Field({ icon, type = "text", placeholder, name, value, onChange, autoComplete }) {
+function Field({ icon, type = "text", placeholder, name, value, onChange, autoComplete, required = false, minLength, maxLength, inputMode, pattern }) {
   return (
     <div className="field">
       <span className="field-icon"><Icon type={icon} /></span>
@@ -182,12 +218,17 @@ function Field({ icon, type = "text", placeholder, name, value, onChange, autoCo
         value={value}
         onChange={onChange}
         autoComplete={autoComplete}
+        required={required}
+        minLength={minLength}
+        maxLength={maxLength}
+        inputMode={inputMode}
+        pattern={pattern}
       />
     </div>
   );
 }
 
-function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorMessage }) {
+function Login({ goRegister, goContact, loginForm, setLoginForm, rememberMe, setRememberMe, onSubmit, submitting, errorMessage }) {
   const handleChange = (event) => {
     const { name, value } = event.target;
     setLoginForm((prev) => ({ ...prev, [name]: value }));
@@ -210,16 +251,16 @@ function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorM
           <h2>Iniciar sesión</h2>
           <p className="card-description">Ingresá a tu cuenta para continuar</p>
 
-          <form onSubmit={(e) => { e.preventDefault(); goHome(); }}>
-            <Field icon="mail" name="email" placeholder="Correo electrónico" value={loginForm.email} onChange={handleChange} autoComplete="email" />
-            <Field icon="lock" type="password" name="password" placeholder="Contraseña" value={loginForm.password} onChange={handleChange} autoComplete="current-password" />
+          <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
+            <Field icon="mail" type="email" name="email" placeholder="Correo electrónico" value={loginForm.email} onChange={handleChange} autoComplete="email" maxLength={254} required />
+            <Field icon="lock" type="password" name="password" placeholder="Contraseña" value={loginForm.password} onChange={handleChange} autoComplete="current-password" maxLength={72} required />
 
             <div className="form-options">
               <label className="remember">
-                <input type="checkbox" />
+                <input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} />
                 <span>Recordarme</span>
               </label>
-              <button type="button" className="text-button">¿Olvidaste tu contraseña?</button>
+              <button type="button" className="text-button" onClick={goContact}>¿Olvidaste tu contraseña?</button>
             </div>
 
             {errorMessage && <p className="error-message">{errorMessage}</p>}
@@ -238,6 +279,176 @@ function Login({ goRegister, goHome, loginForm, setLoginForm, submitting, errorM
       </main>
 
       <span className="page-number">S.A.C. - Pantalla 1</span>
+    </div>
+  );
+}
+
+function ForgotPasswordScreen({
+  email,
+  setEmail,
+  challenge,
+  code,
+  setCode,
+  password,
+  setPassword,
+  passwordConfirmation,
+  setPasswordConfirmation,
+  onRequestCode,
+  onResetPassword,
+  onCancel,
+  submitting,
+  errorMessage,
+  successMessage,
+  completed
+}) {
+  const requestingCode = !challenge;
+  const handleSubmit = (event) => {
+    event.preventDefault();
+    if (requestingCode) {
+      onRequestCode();
+    } else {
+      onResetPassword();
+    }
+  };
+  const passwordsMatch = password === passwordConfirmation;
+
+  return (
+    <div className="page">
+      <div className="decoration top-left" />
+      <div className="decoration bottom-right" />
+      <main className="layout login-layout">
+        <section className="presentation">
+          <Logo />
+          <h1>Recuperá el acceso<br /><strong>a tu cuenta</strong></h1>
+          <p>Te ayudamos a cambiar tu contraseña de forma segura.</p>
+        </section>
+        <section className="card login-card">
+          <h2>{requestingCode ? "Recuperar contraseña" : "Elegí una contraseña nueva"}</h2>
+          <p className="card-description">
+            {requestingCode
+              ? "Ingresá el correo asociado a tu cuenta y te enviaremos un código."
+              : "Ingresá el código que enviamos a tu correo y una contraseña nueva."}
+          </p>
+          {successMessage && <p className="success-message" role="status">{successMessage}</p>}
+          {!completed && (
+            <form onSubmit={handleSubmit}>
+              {requestingCode ? (
+              <Field
+                icon="mail"
+                name="email-recuperacion"
+                type="email"
+                placeholder="Correo electrónico"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                autoComplete="email"
+                maxLength={254}
+                required
+              />
+              ) : (
+                <>
+                <Field
+                  icon="lock"
+                  name="codigo-recuperacion"
+                  placeholder="Código de 6 dígitos"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
+                  minLength={6}
+                  maxLength={6}
+                  required
+                />
+                <Field
+                  icon="lock"
+                  name="nueva-contrasena"
+                  type="password"
+                  placeholder="Nueva contraseña (8 a 72 caracteres)"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={72}
+                  required
+                />
+                <Field
+                  icon="lock"
+                  name="confirmar-nueva-contrasena"
+                  type="password"
+                  placeholder="Confirmá la nueva contraseña"
+                  value={passwordConfirmation}
+                  onChange={(event) => setPasswordConfirmation(event.target.value)}
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={72}
+                  required
+                />
+                {!passwordsMatch && passwordConfirmation && (
+                  <p className="error-message" role="alert">Las contraseñas no coinciden.</p>
+                )}
+                </>
+              )}
+              {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
+              <button
+                className="primary-button"
+                type="submit"
+                disabled={submitting || (!requestingCode && (code.length !== 6 || password.length < 8 || !passwordsMatch))}
+              >
+                {submitting
+                  ? (requestingCode ? "Enviando código..." : "Actualizando contraseña...")
+                  : (requestingCode ? "Enviar código" : "Restablecer contraseña")}
+              </button>
+            </form>
+          )}
+          <button className="login-link" onClick={onCancel} type="button" disabled={submitting}>
+            Volver al inicio de sesión
+          </button>
+        </section>
+      </main>
+      <span className="page-number">S.A.C. - Recuperar contraseña</span>
+    </div>
+  );
+}
+
+function EmailCodeVerification({ email, code, setCode, onSubmit, onCancel, submitting, errorMessage }) {
+  return (
+    <div className="page">
+      <div className="decoration top-left" />
+      <div className="decoration bottom-right" />
+      <main className="layout login-layout">
+        <section className="presentation">
+          <Logo />
+          <h1>Un último paso<br /><strong>para ingresar</strong></h1>
+          <p>Protegemos tu cuenta con una confirmación por correo.</p>
+        </section>
+        <section className="card login-card">
+          <h2>Confirmá tu correo</h2>
+          <p className="card-description">Ingresá el código que enviamos a {email}.</p>
+          <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+            <Field
+              icon="lock"
+              name="codigo"
+              placeholder="Código de 6 dígitos"
+              value={code}
+              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              minLength={6}
+              required
+            />
+            {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
+            <button className="primary-button" type="submit" disabled={submitting || code.length !== 6}>
+              {submitting ? "Verificando..." : "Confirmar e ingresar"}
+            </button>
+          </form>
+          <button className="login-link" onClick={onCancel} type="button" disabled={submitting}>
+            Volver al inicio de sesión
+          </button>
+        </section>
+      </main>
+      <span className="page-number">S.A.C. - Verificación</span>
     </div>
   );
 }
@@ -265,11 +476,10 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
           <p className="card-description">Completá tus datos para unirte a la comunidad</p>
 
           <form onSubmit={(e) => { e.preventDefault(); onSubmit(); }}>
-            <Field icon="lock" name="DNI" type="text" placeholder="DNI" value={registerForm.DNI} onChange={handleChange} autoComplete="off" />
-            <Field icon="user" name="nombre" placeholder="Nombre" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" />
-            <Field icon="user" name="apellido" placeholder="Apellido" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" />
-            <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" />
-            <Field icon="lock" name="contrasena" type="password" placeholder="Contraseña" value={registerForm.contrasena} onChange={handleChange} autoComplete="new-password" />
+            <Field icon="user" name="nombre" placeholder="Nombre (2 a 50 caracteres)" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" minLength={2} maxLength={50} required />
+            <Field icon="user" name="apellido" placeholder="Apellido (2 a 50 caracteres)" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" minLength={2} maxLength={50} required />
+            <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" maxLength={254} required />
+            <Field icon="lock" name="contrasena" type="password" placeholder="Contraseña (8 a 72 caracteres)" value={registerForm.contrasena} onChange={handleChange} autoComplete="new-password" minLength={8} maxLength={72} required />
 
             {errorMessage && <p className="error-message">{errorMessage}</p>}
             {successMessage && <p className="success-message">{successMessage}</p>}
@@ -291,21 +501,36 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
 }
 
 function getUserDisplayName(user) {
-  if (!user) return "Aisha Gomez";
+  if (!user) return "Mi cuenta";
   const nombre = String(user.nombre || user.name || "").trim();
   const apellido = String(user.apellido || user.lastName || "").trim();
   const email = user.email || user.correo;
   if (!nombre && !apellido && email) return String(email).split("@")[0];
-  return `${nombre} ${apellido}`.trim() || "Aisha Gomez";
+  return `${nombre} ${apellido}`.trim() || "Mi cuenta";
 }
 
 function isAdministrator(user) {
   return String(user?.rol || "").trim().toLocaleLowerCase("es") === "administrador";
 }
 
+function isNeighbor(user) {
+  return String(user?.rol || "").trim().toLocaleLowerCase("es") === "vecino";
+}
+
+function isMunicipalArea(user) {
+  return String(user?.rol || "").trim().toLocaleLowerCase("es") === "area_municipal";
+}
+
+function getLandingScreen(user) {
+  if (isAdministrator(user)) return "admin";
+  if (isMunicipalArea(user)) return "municipal";
+  return "home";
+}
+
 function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogout }) {
   const nombreUsuario = getUserDisplayName(user);
   const isAdmin = isAdministrator(user);
+  const isMunicipal = isMunicipalArea(user);
 
   return (
     <div className="sac-app-container">
@@ -335,6 +560,17 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
       <div className="sac-body-layout">
         <aside className="sac-sidebar">
           <nav className="sac-nav-menu">
+            {isMunicipal ? (
+              <button
+                type="button"
+                className={`sac-nav-item ${activeNav === "municipal" ? "active" : ""}`}
+                onClick={() => navigateTo("municipal")}
+              >
+                <span className="sac-nav-icon"><Icon type="file" size={19} /></span>
+                <span>Reportes municipales</span>
+              </button>
+            ) : (
+              <>
             <button
               type="button"
               className={`sac-nav-item ${activeNav === "home" ? "active" : ""}`}
@@ -385,6 +621,8 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
               <span className="sac-nav-icon"><Icon type="user" size={19} /></span>
               <span>Perfil</span>
             </button>
+              </>
+            )}
           </nav>
         </aside>
 
@@ -400,7 +638,7 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
 
 /* Pantalla 3: Dashboard Principal */
 function Dashboard({ navigateTo, user, onLogout }) {
-  const nombre = user?.nombre || "Aisha";
+  const nombre = user?.nombre || "Vecino/a";
 
   return (
     <AppLayout activeNav="home" navigateTo={navigateTo} screenNumber="3" user={user} onLogout={onLogout}>
@@ -458,6 +696,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
   const [categoria, setCategoria] = useState("");
   const [categorias, setCategorias] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
+  const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [coordenadas, setCoordenadas] = useState(null);
@@ -529,23 +768,47 @@ function ReportForm({ navigateTo, user, onLogout }) {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
+      setReportSaveError("La foto debe ser JPG, PNG, GIF o WEBP.");
+      event.target.value = "";
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setReportSaveError("La foto no puede superar los 5 MB.");
+      event.target.value = "";
+      return;
+    }
+
+    setReportSaveError("");
     setFotoFile(file);
     setFotoNombre(file.name);
 
     const reader = new FileReader();
     reader.onload = () => setFotoPreview(reader.result);
+    reader.onerror = () => setReportSaveError("No se pudo leer la foto seleccionada.");
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = async () => {
-    if (!categoria || !descripcion.trim() || !ubicacion.trim()) return;
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (
+      !categoria ||
+      titulo.trim().length < 5 ||
+      titulo.trim().length > 100 ||
+      descripcion.trim().length < 20 ||
+      descripcion.trim().length > 1000 ||
+      ubicacion.trim().length < 5 ||
+      ubicacion.trim().length > 150
+    ) {
+      setReportSaveError("Revisá los límites: título 5–100, descripción 20–1000 y dirección 5–150 caracteres.");
+      return;
+    }
     setReportSaveError("");
     setSubmitting(true);
 
     const formData = new FormData();
-    const selectedCategory = categorias.find((item) => String(item.id_categoria) === categoria);
     formData.append("id_categoria", categoria);
-    formData.append("titulo", `${selectedCategory?.nombre || "Reporte"}: ${descripcion.trim().slice(0, 100)}`);
+    formData.append("titulo", titulo.trim());
     formData.append("descripcion", descripcion.trim());
     formData.append("direccion", ubicacion.trim());
     if (coordenadas) {
@@ -574,11 +837,11 @@ function ReportForm({ navigateTo, user, onLogout }) {
       <p className="sac-page-subtitle">Completá la información para enviar tu reporte</p>
 
       <div className="sac-report-layout">
-        <div className="sac-form-container">
+        <form className="sac-form-container" onSubmit={handleSubmit}>
           <div className="sac-form-group">
-            <label className="sac-label">Categoría</label>
+            <label className="sac-label" htmlFor="reporte-categoria">Categoría</label>
             <div className="sac-select-wrapper">
-              <select className="sac-select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={loadingCategories}>
+              <select id="reporte-categoria" className="sac-select" value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={loadingCategories} required>
                 <option value="" disabled>{loadingCategories ? "Cargando categorías..." : "Elegí el tipo de problema"}</option>
                 {categorias.map((item) => (
                   <option key={item.id_categoria} value={item.id_categoria}>{item.nombre}</option>
@@ -588,16 +851,35 @@ function ReportForm({ navigateTo, user, onLogout }) {
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Descripción</label>
+            <label className="sac-label" htmlFor="reporte-titulo">Título</label>
+            <input
+              id="reporte-titulo"
+              className="sac-input"
+              type="text"
+              placeholder="Resumí el problema (5 a 100 caracteres)"
+              value={titulo}
+              onChange={(event) => setTitulo(event.target.value)}
+              minLength={5}
+              maxLength={100}
+              required
+            />
+            <span className="sac-char-count">{titulo.length}/100 (mínimo 5)</span>
+          </div>
+
+          <div className="sac-form-group">
+            <label className="sac-label" htmlFor="reporte-descripcion">Descripción</label>
             <div className="sac-textarea-wrapper">
               <textarea
+                id="reporte-descripcion"
                 className="sac-textarea"
                 placeholder="Contanos qué sucede..."
-                maxLength={500}
+                minLength={20}
+                maxLength={1000}
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
+                required
               ></textarea>
-              <span className="sac-char-count">{descripcion.length}/500</span>
+              <span className="sac-char-count">{descripcion.length}/1000 (mínimo 20)</span>
             </div>
           </div>
 
@@ -609,6 +891,8 @@ function ReportForm({ navigateTo, user, onLogout }) {
               type="text"
               placeholder="Ingresá una dirección o usá tu ubicación actual"
               value={ubicacion}
+              minLength={5}
+              maxLength={150}
               onChange={(event) => {
                 setUbicacion(event.target.value);
                 setCoordenadas(null);
@@ -646,10 +930,10 @@ function ReportForm({ navigateTo, user, onLogout }) {
             </label>
           </div>
 
-          <button className="sac-primary-btn" onClick={handleSubmit} type="button" disabled={submitting || loadingCategories || !categoria || !descripcion.trim() || !ubicacion.trim()}>
+          <button className="sac-primary-btn" type="submit" disabled={submitting || loadingCategories}>
             {submitting ? "Enviando..." : "Enviar reporte"}
           </button>
-        </div>
+        </form>
 
         <div className="sac-categories-sidebar">
           <h3>Categorías</h3>
@@ -672,14 +956,17 @@ function ReportForm({ navigateTo, user, onLogout }) {
 
 /* Pantalla 5: Lista de Mis Reportes */
 function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
+  const administratorView = isAdministrator(user);
   const [filter, setFilter] = useState("todos");
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
-    apiFetch("/reportes/mis-reportes")
+    const endpoint = administratorView ? "/admin/reportes" : "/reportes/mis-reportes";
+    apiFetch(endpoint, { cache: "no-store" })
       .then((response) => {
         if (active) setReports(response.reportes || []);
       })
@@ -694,7 +981,7 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey, administratorView]);
 
   const filteredReports = reports.filter((report) => {
     const status = String(report.estado || "").toLocaleLowerCase("es");
@@ -711,10 +998,18 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
     return "status-pending";
   };
 
+  const reloadReports = () => {
+    setLoading(true);
+    setError("");
+    setReloadKey((key) => key + 1);
+  };
+
   return (
     <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Mis reportes</h1>
-      <p className="sac-page-subtitle">Acá podés ver el estado de todos tus reportes</p>
+      <h1 className="sac-page-title">{administratorView ? "Reportes" : "Mis reportes"}</h1>
+      <p className="sac-page-subtitle">
+        {administratorView ? "Consultá todos los reportes registrados." : "Acá podés ver el estado de todos tus reportes"}
+      </p>
 
       <div className="sac-filter-tabs">
         <button type="button" className={`sac-tab ${filter === "todos" ? "active" : ""}`} onClick={() => setFilter("todos")}>Todos</button>
@@ -724,18 +1019,48 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
       </div>
 
       <div className="sac-reports-list">
-        {loading && <p className="sac-admin-empty">Cargando tus reportes...</p>}
-        {error && <p className="error-message" role="alert">{error}</p>}
+        {loading && <p className="sac-admin-empty">{administratorView ? "Cargando reportes..." : "Cargando tus reportes..."}</p>}
+        {error && (
+          <div className="sac-admin-error" role="alert">
+            <p className="error-message">{error}</p>
+            <button type="button" className="sac-admin-retry-btn" onClick={reloadReports} disabled={loading}>
+              {loading ? "Cargando..." : "Reintentar"}
+            </button>
+          </div>
+        )}
         {!loading && !error && filteredReports.length === 0 && (
-          <p className="sac-admin-empty">No hay reportes para mostrar en este filtro.</p>
+          <div className="sac-admin-empty">
+            <p>
+              {reports.length === 0
+                ? (administratorView ? "Todavía no hay reportes registrados." : "Todavía no creaste reportes.")
+                : "No hay reportes para mostrar en este filtro."}
+            </p>
+            <button type="button" className="sac-secondary-btn" onClick={reloadReports}>
+              Actualizar lista
+            </button>
+            {reports.length === 0 && !administratorView && (
+              <button type="button" className="sac-primary-btn" onClick={() => navigateTo("reportar-form")}>
+                Crear un reporte
+              </button>
+            )}
+          </div>
         )}
         {filteredReports.map((item) => (
           <div
             className="sac-report-card clickable"
             key={item.id_reporte}
+            role="button"
+            tabIndex={0}
             onClick={() => {
               setSelectedReportId(item.id_reporte);
               navigateTo("detalle-reporte");
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                setSelectedReportId(item.id_reporte);
+                navigateTo("detalle-reporte");
+              }
             }}
           >
             <ReportPhoto className="sac-report-thumb" photo={item.foto} alt={`Foto del reporte ${item.titulo}`} />
@@ -754,19 +1079,20 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
 }
 
 /* Pantalla 6: Mapa */
-function MapScreen({ navigateTo, user, onLogout }) {
+function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
   const [searchText, setSearchText] = useState("Benito Juárez, Buenos Aires, Argentina");
   const [mapLocation, setMapLocation] = useState("Benito Juárez, Buenos Aires, Argentina");
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [reports, setReports] = useState([]);
   const [loadingReports, setLoadingReports] = useState(true);
   const [reportsError, setReportsError] = useState("");
-  const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapLocation)}&z=16&output=embed`;
+  const mapCanvasRef = useRef(null);
+  const mapEmbedUrl = `https://www.google.com/maps?q=${encodeURIComponent(mapLocation)}&z=19&output=embed`;
   const mapSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapLocation)}`;
 
   useEffect(() => {
     let active = true;
-    apiFetch("/reportes/todos")
+    apiFetch("/reportes/todos", { cache: "no-store" })
       .then((response) => {
         if (active) setReports(response.reportes || []);
       })
@@ -793,18 +1119,12 @@ function MapScreen({ navigateTo, user, onLogout }) {
   };
 
   const handleSelectReport = (report) => {
-    const hasCoordinates = report.latitud !== null
-      && report.latitud !== undefined
-      && report.longitud !== null
-      && report.longitud !== undefined;
-    const latitud = hasCoordinates ? Number(report.latitud) : NaN;
-    const longitud = hasCoordinates ? Number(report.longitud) : NaN;
-    const location = hasCoordinates && Number.isFinite(latitud) && Number.isFinite(longitud)
-      ? `${latitud},${longitud}`
-      : report.direccion || "Benito Juárez, Buenos Aires, Argentina";
-    setMapLocation(location);
-    setSearchText(report.direccion || location);
+    const location = getReportLocation(report);
+    setMapLocation(location.query);
+    setSearchText(location.exact ? report.direccion : location.query);
     setSelectedReportId(report.id_reporte);
+    onOpenReport(report.id_reporte);
+    mapCanvasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const getStatusClass = (status) => {
@@ -835,7 +1155,7 @@ function MapScreen({ navigateTo, user, onLogout }) {
         </div>
       </form>
 
-      <div className="sac-map-canvas">
+      <div className="sac-map-canvas" ref={mapCanvasRef}>
         <iframe
           className="sac-google-map"
           src={mapEmbedUrl}
@@ -868,23 +1188,48 @@ function MapScreen({ navigateTo, user, onLogout }) {
             <p className="sac-admin-empty">Todavía no hay reportes aprobados para publicar.</p>
           )}
           {reports.map((report) => (
-            <button
+            <div
               className={`sac-map-report-item ${selectedReportId === report.id_reporte ? "selected" : ""}`}
               key={report.id_reporte}
-              onClick={() => handleSelectReport(report)}
-              type="button"
-              aria-pressed={selectedReportId === report.id_reporte}
             >
-              {report.foto
-                ? <ReportPhoto className="sac-map-report-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
-                : <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>}
-              <span className="sac-map-report-details">
-                <strong>{report.titulo}</strong>
-                <span className="sac-map-report-location">{report.direccion || "Ubicación no informada"}</span>
-                <span className="sac-map-report-date">{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : ""}</span>
-              </span>
-              <span className={`sac-status-badge ${getStatusClass(report.estado)}`}>{report.estado}</span>
-            </button>
+              <button
+                className="sac-map-report-select"
+                onClick={() => handleSelectReport(report)}
+                type="button"
+                aria-pressed={selectedReportId === report.id_reporte}
+                aria-label={`Ubicar ${report.titulo} en el mapa`}
+              >
+                {report.foto
+                  ? <ReportPhoto className="sac-map-report-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
+                  : <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>}
+                <span className="sac-map-report-details">
+                  <strong>{report.titulo}</strong>
+                  <span className="sac-map-report-location">{report.direccion || "Ubicación no informada"}</span>
+                  <span className="sac-map-report-date">{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : ""}</span>
+                  <span className="sac-map-report-date">Seleccioná para ubicarlo en el mapa</span>
+                </span>
+                <span className={`sac-status-badge ${getStatusClass(report.estado)}`}>{report.estado}</span>
+              </button>
+              <button
+                className="sac-map-report-detail-button"
+                type="button"
+                onClick={() => {
+                  setSelectedReportId(report.id_reporte);
+                  navigateTo("detalle-reporte");
+                }}
+              >
+                Ver detalle
+              </button>
+              <a
+                className="sac-map-report-detail-button"
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(getReportLocation(report).query)}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(event) => event.stopPropagation()}
+              >
+                Abrir ubicación
+              </a>
+            </div>
           ))}
         </div>
       </section>
@@ -899,17 +1244,17 @@ function ReportDetail({ navigateTo, user, onLogout, reportId }) {
   const [error, setError] = useState("");
   const [likes, setLikes] = useState(0);
   const [hasLiked, setHasLiked] = useState(false);
+  const [supporting, setSupporting] = useState(false);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
-    setError("");
 
     apiFetch(`/reportes/${reportId}`)
       .then((response) => {
         if (!active) return;
         setReport(response.reporte);
         setLikes(Number(response.apoyos) || 0);
+        setHasLiked(Boolean(response.apoyado));
       })
       .catch((requestError) => {
         console.error(`No se pudo cargar el reporte ${reportId}.`, requestError);
@@ -924,13 +1269,18 @@ function ReportDetail({ navigateTo, user, onLogout, reportId }) {
     };
   }, [reportId]);
 
-  const handleSupport = () => {
-    if (!hasLiked) {
-      setLikes(likes + 1);
-      setHasLiked(true);
-    } else {
-      setLikes(likes - 1);
-      setHasLiked(false);
+  const handleSupport = async () => {
+    setSupporting(true);
+    setError("");
+    try {
+      const response = await apiFetch(`/reportes/${reportId}/apoyar`, { method: "POST" });
+      setHasLiked(Boolean(response.apoyado));
+      setLikes((current) => Math.max(0, current + (response.apoyado ? 1 : -1)));
+    } catch (requestError) {
+      console.error(`No se pudo actualizar el apoyo del reporte ${reportId}.`, requestError);
+      setError(requestError.message || "No se pudo actualizar tu apoyo.");
+    } finally {
+      setSupporting(false);
     }
   };
 
@@ -962,10 +1312,12 @@ function ReportDetail({ navigateTo, user, onLogout, reportId }) {
             {report.vecino && <p><strong>Reportado por:</strong> {report.vecino}</p>}
           </div>
 
-          <button className={`sac-support-button ${hasLiked ? "supported" : ""}`} onClick={handleSupport} type="button">
-            <span className="sac-like-icon"><Icon type="like" size={18} /></span>
-            <span>{hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
-          </button>
+          {isNeighbor(user) && (
+            <button className={`sac-support-button ${hasLiked ? "supported" : ""}`} onClick={handleSupport} type="button" disabled={supporting}>
+              <span className="sac-like-icon"><Icon type="like" size={18} /></span>
+              <span>{supporting ? "Actualizando..." : hasLiked ? "Reporte apoyado" : "Apoyar reporte"}</span>
+            </button>
+          )}
         </div>
       )}
     </AppLayout>
@@ -974,31 +1326,79 @@ function ReportDetail({ navigateTo, user, onLogout, reportId }) {
 
 /* Pantalla 8: Notificaciones */
 function NotificationsScreen({ navigateTo, user, onLogout }) {
-  const notifications = [
-    { id: 1, icon: "clipboard", iconBg: "#f97316", title: "Tu reporte fue revisado", desc: "El administrador revisó tu reporte #152.", time: "Hace 2 horas" },
-    { id: 2, icon: "pin", iconBg: "#f97316", title: "El municipio comenzó a trabajar", desc: "El área de Obras Públicas asignó tu reporte #152.", time: "Hace 5 horas" },
-    { id: 3, icon: "file", iconBg: "#f97316", title: "Tu reporte fue resuelto", desc: "El reporte Bache en Av. 2 fue marcado como resuelto.", time: "Hace 2 días" },
-    { id: 4, icon: "like", iconBg: "#ea580c", title: "Tu reporte fue apoyado", desc: "3 vecinos más apoyaron tu reporte #138.", time: "Hace 3 días" }
-  ];
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [updating, setUpdating] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    apiFetch("/notificaciones")
+      .then((response) => {
+        if (active) setNotifications(response.notificaciones || []);
+      })
+      .catch((requestError) => {
+        console.error("No se pudieron cargar las notificaciones.", requestError);
+        if (active) setError(requestError.message || "No se pudieron cargar las notificaciones.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleMarkAsRead = async () => {
+    setUpdating(true);
+    setError("");
+    try {
+      await apiFetch("/notificaciones/leer", { method: "PUT" });
+      setNotifications((current) => current.map((item) => ({ ...item, leida: true })));
+    } catch (requestError) {
+      console.error("No se pudieron marcar las notificaciones como leídas.", requestError);
+      setError(requestError.message || "No se pudieron actualizar las notificaciones.");
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const hasUnread = notifications.some((item) => !item.leida);
 
   return (
     <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Notificaciones</h1>
       <p className="sac-page-subtitle">Enterate de todas las novedades</p>
 
+      {hasUnread && (
+        <button className="sac-secondary-btn" type="button" onClick={handleMarkAsRead} disabled={updating}>
+          {updating ? "Actualizando..." : "Marcar todas como leídas"}
+        </button>
+      )}
+      {error && <p className="error-message" role="alert">{error}</p>}
       <div className="sac-notifications-list">
-        {notifications.map((item) => (
-          <div className="sac-notification-card" key={item.id}>
-            <div className="sac-notification-icon-wrapper" style={{ backgroundColor: item.iconBg }}>
-              <Icon type={item.icon} size={20} />
+        {loading && <p className="sac-admin-empty">Cargando notificaciones...</p>}
+        {!loading && !error && notifications.length === 0 && (
+          <p className="sac-admin-empty">Todavía no tenés notificaciones.</p>
+        )}
+        {notifications.map((item) => {
+          const date = item.fecha_notificacion ? new Date(item.fecha_notificacion) : null;
+          return (
+            <div className={`sac-notification-card ${item.leida ? "" : "unread"}`} key={item.id_notificacion}>
+              <div className="sac-notification-icon-wrapper" style={{ backgroundColor: "#f97316" }}>
+                <Icon type={item.tipo === "estado" ? "clipboard" : "bell"} size={20} />
+              </div>
+              <div className="sac-notification-content">
+                <h3>{item.tipo === "estado" ? "Actualización de tu reporte" : "Notificación"}</h3>
+                <p>{item.mensaje}</p>
+              </div>
+              <div className="sac-notification-time">
+                {date && !Number.isNaN(date.getTime()) ? date.toLocaleString("es-AR") : ""}
+              </div>
             </div>
-            <div className="sac-notification-content">
-              <h3>{item.title}</h3>
-              <p>{item.desc}</p>
-            </div>
-            <div className="sac-notification-time">{item.time}</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </AppLayout>
   );
@@ -1076,62 +1476,96 @@ function GuiaUsoScreen({ navigateTo, user, onLogout }) {
 /* Pantalla 11: Perfil */
 function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [nombre, setNombre] = useState(user?.nombre || "Aisha");
-  const [apellido, setApellido] = useState(user?.apellido || "Gomez");
-  const [email, setEmail] = useState(user?.email || "aisha@gmail.com");
-  const [foto, setFoto] = useState(user?.foto || null);
+  const [profileDraft, setProfileDraft] = useState(null);
   const [successMsg, setSuccessMsg] = useState("");
   const [profileError, setProfileError] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
 
-  useEffect(() => {
-    setNombre(user?.nombre || "Aisha");
-    setApellido(user?.apellido || "Gomez");
-    setEmail(user?.email || "aisha@gmail.com");
-    setFoto(user?.foto || null);
-  }, [user]);
+  const startEditing = () => {
+    setProfileDraft({
+      nombre: user?.nombre || "",
+      apellido: user?.apellido || "",
+      email: user?.email || "",
+      foto: user?.foto || null,
+      fotoFile: null
+    });
+    setIsEditing(true);
+  };
 
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     setProfileError("");
     const updated = {
       ...user,
-      nombre: nombre.trim(),
-      apellido: apellido.trim(),
-      email: email.trim(),
-      foto
+      nombre: profileDraft.nombre.trim(),
+      apellido: profileDraft.apellido.trim(),
+      email: profileDraft.email.trim(),
+      foto: profileDraft.foto
     };
 
-    try {
-      await apiFetch("/perfil/editar", {
-        method: "PUT",
-        body: JSON.stringify({
-          nombre: updated.nombre,
-          apellido: updated.apellido,
-          email: updated.email
-        })
-      });
-      localStorage.setItem("sac_user", JSON.stringify(updated));
-    } catch (error) {
-      console.error("No se pudo actualizar el perfil.", error);
-      setProfileError(error.message || "No se pudieron guardar los cambios. Intentá nuevamente.");
+    if (updated.nombre.length < 2 || updated.nombre.length > 50) {
+      setProfileError("El nombre debe tener entre 2 y 50 caracteres.");
+      return;
+    }
+    if (updated.apellido.length < 2 || updated.apellido.length > 50) {
+      setProfileError("El apellido debe tener entre 2 y 50 caracteres.");
+      return;
+    }
+    if (updated.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updated.email)) {
+      setProfileError("Ingresá un correo válido de hasta 254 caracteres.");
       return;
     }
 
-    setUser(updated);
-    setIsEditing(false);
-    setSuccessMsg("¡Perfil actualizado con éxito!");
-    setTimeout(() => setSuccessMsg(""), 3000);
+    setSavingProfile(true);
+    try {
+      const formData = new FormData();
+      formData.append("nombre", updated.nombre);
+      formData.append("apellido", updated.apellido);
+      formData.append("email", updated.email);
+      if (profileDraft.fotoFile) formData.append("foto", profileDraft.fotoFile);
+
+      const response = await apiFetch("/perfil/editar", {
+        method: "PUT",
+        body: formData
+      });
+      if (!response.usuario) {
+        throw new Error("El servidor no devolvió el perfil actualizado.");
+      }
+      const persistedUser = { ...updated, ...response.usuario };
+      setUser(persistedUser);
+      getSessionStorage().setItem("sac_user", JSON.stringify(persistedUser));
+      setIsEditing(false);
+      setSuccessMsg("¡Perfil actualizado con éxito!");
+      setTimeout(() => setSuccessMsg(""), 3000);
+    } catch (error) {
+      console.error("No se pudo actualizar el perfil.", error);
+      setProfileError(error.message || "No se pudieron guardar los cambios. Intentá nuevamente.");
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handlePhotoChange = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFoto(reader.result);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/gif", "image/webp"].includes(file.type)) {
+      setProfileError("La foto debe ser JPG, PNG, GIF o WEBP.");
+      e.target.value = "";
+      return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError("La foto no puede superar los 5 MB.");
+      e.target.value = "";
+      return;
+    }
+
+    setProfileError("");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfileDraft((current) => ({ ...current, foto: reader.result, fotoFile: file }));
+    };
+    reader.onerror = () => setProfileError("No se pudo leer la foto seleccionada.");
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -1146,16 +1580,16 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
         <>
           <div className="sac-profile-card-header">
             <div className="sac-profile-avatar-large">
-              {foto ? <img src={foto} alt="Avatar" className="sac-avatar-img" /> : <span><Icon type="user" size={26} /></span>}
+              {user?.foto ? <img src={user.foto} alt="Avatar" className="sac-avatar-img" /> : <span><Icon type="user" size={26} /></span>}
             </div>
             <div>
-              <h2>{nombre} {apellido}</h2>
-              <p>{email}</p>
+              <h2>{user?.nombre} {user?.apellido}</h2>
+              <p>{user?.email}</p>
             </div>
           </div>
 
           <div className="sac-profile-menu-list">
-            <button className="sac-profile-menu-item" onClick={() => setIsEditing(true)} type="button">
+            <button className="sac-profile-menu-item" onClick={startEditing} type="button">
               <span className="p-icon"><Icon type="user" size={16} /></span>
               <span>Editar perfil</span>
               <span className="p-arrow">›</span>
@@ -1175,7 +1609,7 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
               <span>Notificaciones</span>
               <span className="p-arrow">›</span>
             </button>
-            <button className="sac-profile-menu-item" type="button">
+            <button className="sac-profile-menu-item" onClick={() => navigateTo("contacto")} type="button">
               <span className="p-icon"><Icon type="phone" size={16} /></span>
               <span>Contacto</span>
               <span className="p-arrow">›</span>
@@ -1189,33 +1623,119 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
             <input id="perfil-foto" type="file" accept="image/*" onChange={handlePhotoChange} className="sac-file-input" />
             <label className="sac-profile-upload" htmlFor="perfil-foto">
               <span className="sac-profile-upload-preview">
-                {foto ? <img src={foto} alt="" /> : <Icon type="user" size={22} />}
+                {profileDraft.foto ? <img src={profileDraft.foto} alt="" /> : <Icon type="user" size={22} />}
               </span>
               <span className="sac-upload-copy">
-                <strong>{foto ? "Foto seleccionada" : "Agregá una foto de perfil"}</strong>
+                <strong>{profileDraft.foto ? "Foto seleccionada" : "Agregá una foto de perfil"}</strong>
                 <small>Elegí una imagen desde tu dispositivo</small>
               </span>
-              <span className="sac-upload-action">{foto ? "Cambiar" : "Elegir foto"}</span>
+              <span className="sac-upload-action">{profileDraft.foto ? "Cambiar" : "Elegir foto"}</span>
             </label>
           </div>
           <div className="sac-form-group">
             <label className="sac-label">Nombre</label>
-            <input type="text" className="sac-input" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+            <input type="text" className="sac-input" value={profileDraft.nombre} onChange={(e) => setProfileDraft((current) => ({ ...current, nombre: e.target.value }))} minLength={2} maxLength={50} required />
           </div>
           <div className="sac-form-group">
             <label className="sac-label">Apellido</label>
-            <input type="text" className="sac-input" value={apellido} onChange={(e) => setApellido(e.target.value)} required />
+            <input type="text" className="sac-input" value={profileDraft.apellido} onChange={(e) => setProfileDraft((current) => ({ ...current, apellido: e.target.value }))} minLength={2} maxLength={50} required />
           </div>
           <div className="sac-form-group">
             <label className="sac-label">Correo electrónico</label>
-            <input type="email" className="sac-input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <input type="email" className="sac-input" value={profileDraft.email} onChange={(e) => setProfileDraft((current) => ({ ...current, email: e.target.value }))} maxLength={254} required />
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
-            <button className="sac-primary-btn" type="submit">Guardar cambios</button>
-            <button className="sac-secondary-btn" type="button" onClick={() => setIsEditing(false)}>Cancelar</button>
+            <button className="sac-primary-btn" type="submit" disabled={savingProfile}>
+              {savingProfile ? "Guardando..." : "Guardar cambios"}
+            </button>
+            <button className="sac-secondary-btn" type="button" onClick={() => { setIsEditing(false); setProfileDraft(null); }} disabled={savingProfile}>Cancelar</button>
           </div>
         </form>
       )}
+    </AppLayout>
+  );
+}
+
+function ContactScreen({ navigateTo, user, onLogout }) {
+  const [asunto, setAsunto] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setSuccess("");
+    const asuntoLimpio = asunto.trim();
+    const mensajeLimpio = mensaje.trim();
+    if (asuntoLimpio.length < 5 || asuntoLimpio.length > 100) {
+      setError("El asunto debe tener entre 5 y 100 caracteres.");
+      return;
+    }
+    if (mensajeLimpio.length < 20 || mensajeLimpio.length > 1000) {
+      setError("El mensaje debe tener entre 20 y 1000 caracteres.");
+      return;
+    }
+    setSubmitting(true);
+
+    try {
+      const response = await apiFetch("/contacto", {
+        method: "POST",
+        body: JSON.stringify({ asunto: asuntoLimpio, mensaje: mensajeLimpio })
+      });
+      setSuccess(response.mensaje || "Tu consulta fue enviada correctamente.");
+      setAsunto("");
+      setMensaje("");
+    } catch (requestError) {
+      console.error("No se pudo enviar la consulta de contacto.", requestError);
+      setError(requestError.message || "No se pudo enviar tu consulta.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="13" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Contacto y ayuda</h1>
+      <p className="sac-page-subtitle">Enviá una consulta al equipo de atención ciudadana.</p>
+      {error && <p className="error-message" role="alert">{error}</p>}
+      {success && <p className="success-message" role="status">{success}</p>}
+      <form className="sac-form-container sac-contact-form" onSubmit={handleSubmit}>
+        <p>Tu consulta quedará asociada a la cuenta {user?.email}.</p>
+        <div className="sac-form-group">
+          <label className="sac-label" htmlFor="contacto-asunto">Asunto</label>
+          <input
+            id="contacto-asunto"
+            className="sac-input"
+            value={asunto}
+            onChange={(event) => setAsunto(event.target.value)}
+            minLength={5}
+            maxLength={100}
+            required
+          />
+          <span className="sac-char-count">{asunto.length}/100 (mínimo 5)</span>
+        </div>
+        <div className="sac-form-group">
+          <label className="sac-label" htmlFor="contacto-mensaje">Mensaje</label>
+          <textarea
+            id="contacto-mensaje"
+            className="sac-textarea"
+            value={mensaje}
+            onChange={(event) => setMensaje(event.target.value)}
+            minLength={20}
+            maxLength={1000}
+            required
+          />
+          <span className="sac-char-count">{mensaje.length}/1000 (mínimo 20)</span>
+        </div>
+        <button className="sac-primary-btn" type="submit" disabled={submitting}>
+          {submitting ? "Enviando..." : "Enviar consulta"}
+        </button>
+        <button className="sac-secondary-btn" type="button" onClick={() => navigateTo("perfil")}>
+          Volver al perfil
+        </button>
+      </form>
     </AppLayout>
   );
 }
@@ -1227,8 +1747,9 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
   const [confirmar, setConfirmar] = useState("");
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMsg("");
@@ -1238,15 +1759,30 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
       return;
     }
 
-    if (nueva.length < 6) {
-      setError("La contraseña debe tener al menos 6 caracteres.");
+    if (nueva.length < 8 || nueva.length > 72) {
+      setError("La contraseña nueva debe tener entre 8 y 72 caracteres.");
       return;
     }
 
-    setMsg("¡Contraseña actualizada correctamente!");
-    setTimeout(() => {
-      navigateTo("perfil");
-    }, 1200);
+    setSubmitting(true);
+    try {
+      const response = await apiFetch("/perfil/contrasena", {
+        method: "PUT",
+        body: JSON.stringify({
+          contrasenaActual: actual,
+          contrasenaNueva: nueva
+        })
+      });
+      setMsg(response.mensaje || "¡Contraseña actualizada correctamente!");
+      setActual("");
+      setNueva("");
+      setConfirmar("");
+    } catch (requestError) {
+      console.error("No se pudo actualizar la contraseña.", requestError);
+      setError(requestError.message || "No se pudo actualizar la contraseña. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -1257,8 +1793,9 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
       <div className="sac-detail-card">
         <form onSubmit={handleSubmit}>
           <div className="sac-form-group">
-            <label className="sac-label">Contraseña actual</label>
+            <label className="sac-label" htmlFor="password-actual">Contraseña actual</label>
             <input
+              id="password-actual"
               type="password"
               className="sac-input"
               placeholder="Contraseña"
@@ -1269,25 +1806,31 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Nueva contraseña</label>
+            <label className="sac-label" htmlFor="password-nueva">Nueva contraseña</label>
             <input
+              id="password-nueva"
               type="password"
               className="sac-input"
               placeholder="Contraseña"
               value={nueva}
               onChange={(e) => setNueva(e.target.value)}
+              minLength={8}
+              maxLength={72}
               required
             />
           </div>
 
           <div className="sac-form-group">
-            <label className="sac-label">Confirmar nueva contraseña</label>
+            <label className="sac-label" htmlFor="password-confirmar">Confirmar nueva contraseña</label>
             <input
+              id="password-confirmar"
               type="password"
               className="sac-input"
               placeholder="Contraseña"
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
+              minLength={8}
+              maxLength={72}
               required
             />
           </div>
@@ -1295,8 +1838,8 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
           {error && <p className="error-message">{error}</p>}
           {msg && <p className="success-message">{msg}</p>}
 
-          <button className="sac-primary-btn" type="submit" style={{ marginTop: "15px" }}>
-            Guardar cambios
+          <button className="sac-primary-btn" type="submit" style={{ marginTop: "15px" }} disabled={submitting}>
+            {submitting ? "Guardando..." : "Guardar cambios"}
           </button>
         </form>
       </div>
@@ -1307,6 +1850,7 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
 function AdminScreen({ navigateTo, user, onLogout }) {
   const [reportes, setReportes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
+  const [consultas, setConsultas] = useState([]);
   const [estados, setEstados] = useState([]);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos");
@@ -1321,18 +1865,18 @@ function AdminScreen({ navigateTo, user, onLogout }) {
     let active = true;
 
     const loadAdminData = async () => {
-      setLoading(true);
       setError("");
 
       const results = await Promise.allSettled([
         apiFetch("/admin/reportes"),
         apiFetch("/admin/usuarios"),
-        apiFetch("/admin/estados")
+        apiFetch("/admin/estados"),
+        apiFetch("/admin/contacto")
       ]);
       if (!active) return;
 
       const failures = [];
-      const [reportsResult, usersResult, statesResult] = results;
+      const [reportsResult, usersResult, statesResult, contactsResult] = results;
       if (reportsResult.status === "fulfilled") {
         setReportes(reportsResult.value.reportes || []);
       } else {
@@ -1350,6 +1894,12 @@ function AdminScreen({ navigateTo, user, onLogout }) {
       } else {
         console.error("No se pudieron cargar los estados administrativos.", statesResult.reason);
         failures.push(`Estados: ${statesResult.reason.message || "no disponibles"}`);
+      }
+      if (contactsResult.status === "fulfilled") {
+        setConsultas(contactsResult.value.consultas || []);
+      } else {
+        console.error("No se pudieron cargar las consultas de contacto.", contactsResult.reason);
+        failures.push(`Contacto: ${contactsResult.reason.message || "no disponible"}`);
       }
 
       if (failures.length) setError(`No se pudieron cargar todos los datos. ${failures.join(". ")}`);
@@ -1437,7 +1987,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
   };
 
   const handleDeleteReport = async (report) => {
-    if (!window.confirm(`¿Eliminar el reporte “${report.titulo}” y sus comentarios y apoyos? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Eliminar el reporte “${report.titulo}” y sus apoyos? Esta acción no se puede deshacer.`)) return;
 
     setError("");
     setDeletingRecord(`reporte-${report.id_reporte}`);
@@ -1454,7 +2004,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
 
   const handleDeleteUser = async (registeredUser) => {
     const userName = `${registeredUser.nombre || ""} ${registeredUser.apellido || ""}`.trim() || registeredUser.email;
-    if (!window.confirm(`¿Eliminar a ${userName}, todos sus reportes, comentarios y apoyos? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Eliminar a ${userName}, todos sus reportes y apoyos? Esta acción no se puede deshacer.`)) return;
 
     setError("");
     setDeletingRecord(`usuario-${registeredUser.id_usuario}`);
@@ -1525,7 +2075,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
           <button
             type="button"
             className="sac-admin-retry-btn"
-            onClick={() => setReloadKey((key) => key + 1)}
+            onClick={() => { setLoading(true); setReloadKey((key) => key + 1); }}
             disabled={loading}
           >
             {loading ? "Cargando..." : "Reintentar"}
@@ -1633,6 +2183,31 @@ function AdminScreen({ navigateTo, user, onLogout }) {
             <h2>Registro de usuarios</h2>
             <p>Listado completo de cuentas registradas</p>
           </div>
+
+          <div className="sac-admin-section">
+            <div className="sac-admin-section-header">
+              <div>
+                <h2>Consultas de contacto</h2>
+                <p>Mensajes recibidos de vecinos</p>
+              </div>
+              <span className="sac-map-reports-count">{loading ? "Cargando..." : `${consultas.length} consultas`}</span>
+            </div>
+            <div className="sac-admin-list">
+              {!loading && consultas.length === 0 && (
+                <p className="sac-admin-empty">No hay consultas de contacto.</p>
+              )}
+              {consultas.map((consulta) => (
+                <article className="sac-admin-contact-row" key={consulta.id_contacto}>
+                  <div>
+                    <strong>{consulta.asunto}</strong>
+                    <p>{consulta.mensaje}</p>
+                    <span>{consulta.usuario} · {consulta.email}</span>
+                  </div>
+                  <time>{consulta.fecha_contacto ? new Date(consulta.fecha_contacto).toLocaleString("es-AR") : ""}</time>
+                </article>
+              ))}
+            </div>
+          </div>
           <span className="sac-map-reports-count">{loading ? "Cargando..." : `${usuarios.length} usuarios`}</span>
         </div>
         <div className="sac-admin-users-list">
@@ -1661,6 +2236,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
                 >
                   <option value="vecino">Vecino</option>
                   <option value="administrador">Administrador</option>
+                  <option value="area_municipal">Área municipal</option>
                 </select>
                 {updatingUserRoleId === registeredUser.id_usuario && <span className="sac-role-saving">Guardando...</span>}
               </label>
@@ -1684,28 +2260,181 @@ function AdminScreen({ navigateTo, user, onLogout }) {
   );
 }
 
+function MunicipalScreen({ navigateTo, user, onLogout }) {
+  const [reports, setReports] = useState([]);
+  const [states, setStates] = useState([]);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [updatingReportId, setUpdatingReportId] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const loadMunicipalData = async () => {
+      setLoading(true);
+      setError("");
+      const results = await Promise.allSettled([
+        apiFetch("/municipal/reportes"),
+        apiFetch("/municipal/estados")
+      ]);
+      if (!active) return;
+
+      const [reportsResult, statesResult] = results;
+      const errors = [];
+      if (reportsResult.status === "fulfilled") {
+        setReports(reportsResult.value.reportes || []);
+      } else {
+        console.error("No se pudieron cargar los reportes municipales.", reportsResult.reason);
+        errors.push(reportsResult.reason.message || "No se pudieron cargar los reportes");
+      }
+      if (statesResult.status === "fulfilled") {
+        setStates(statesResult.value.estados || []);
+      } else {
+        console.error("No se pudieron cargar los estados municipales.", statesResult.reason);
+        errors.push(statesResult.reason.message || "No se pudieron cargar los estados");
+      }
+      if (errors.length) setError(errors.join(". "));
+      setLoading(false);
+    };
+
+    loadMunicipalData();
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
+
+  const filteredReports = reports.filter((report) =>
+    `${report.id_reporte} ${report.titulo} ${report.direccion} ${report.vecino} ${report.estado}`
+      .toLocaleLowerCase("es")
+      .includes(search.toLocaleLowerCase("es"))
+  );
+
+  const handleStatusChange = async (reportId, estadoId) => {
+    setError("");
+    setUpdatingReportId(reportId);
+    try {
+      await apiFetch(`/municipal/reportes/${reportId}/estado`, {
+        method: "PUT",
+        body: JSON.stringify({ id_estado: Number(estadoId) })
+      });
+      const selectedState = states.find((state) => String(state.id_estado) === String(estadoId));
+      if (selectedState) {
+        setReports((current) => current.map((report) =>
+          report.id_reporte === reportId ? { ...report, estado: selectedState.nombre, id_estado: selectedState.id_estado } : report
+        ));
+      }
+    } catch (requestError) {
+      console.error(`No se pudo actualizar el estado del reporte municipal ${reportId}.`, requestError);
+      setError(requestError.message || "No se pudo actualizar el estado del reporte.");
+    } finally {
+      setUpdatingReportId(null);
+    }
+  };
+
+  return (
+    <AppLayout activeNav="municipal" navigateTo={navigateTo} screenNumber="14" user={user} onLogout={onLogout}>
+      <div className="sac-admin-section">
+        <div className="sac-admin-header">
+          <div>
+            <span className="sac-admin-eyebrow">Área municipal</span>
+            <h1 className="sac-page-title">Seguimiento de reportes</h1>
+          </div>
+          <div className="sac-admin-role"><Icon type="clipboard" size={15} /> Solo consulta y estados</div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="sac-admin-error" role="alert">
+          <p className="error-message">{error}</p>
+          <button
+            type="button"
+            className="sac-admin-retry-btn"
+            onClick={() => setReloadKey((key) => key + 1)}
+            disabled={loading}
+          >
+            {loading ? "Cargando..." : "Reintentar"}
+          </button>
+        </div>
+      )}
+
+      <div className="sac-admin-section">
+        <div className="sac-admin-section-header">
+          <div>
+            <h2>Reportes</h2>
+            <p>Consultá los reportes y actualizá únicamente su estado.</p>
+          </div>
+          <label className="sac-admin-search">
+            <Icon type="map" size={14} />
+            <input
+              type="search"
+              placeholder="Buscar reporte"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </label>
+        </div>
+        <div className="sac-admin-list">
+          {loading && <p className="sac-admin-empty">Cargando reportes...</p>}
+          {!loading && filteredReports.length === 0 && (
+            <p className="sac-admin-empty">No hay reportes que coincidan con la búsqueda.</p>
+          )}
+          {filteredReports.map((report) => (
+            <div className="sac-admin-row" key={report.id_reporte}>
+              <div className="sac-admin-report-summary">
+                <ReportPhoto className="sac-admin-report-photo" photo={report.foto} alt={`Foto del reporte ${report.titulo}`} />
+                <div className="sac-admin-report-copy">
+                  <strong>#{report.id_reporte} · {report.titulo}</strong>
+                  <span>{report.categoria} · {report.direccion || "Ubicación no informada"}</span>
+                  <span>{report.vecino || "Vecino"} · {report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : "Fecha no disponible"}</span>
+                  {report.descripcion && <span>{report.descripcion}</span>}
+                </div>
+              </div>
+              <div className="sac-admin-control">
+                <select
+                  className="sac-select"
+                  value={report.id_estado || ""}
+                  onChange={(event) => handleStatusChange(report.id_reporte, event.target.value)}
+                  disabled={updatingReportId === report.id_reporte || states.length === 0}
+                  aria-label={`Cambiar estado del reporte ${report.id_reporte}`}
+                >
+                  {states.map((state) => (
+                    <option key={state.id_estado} value={state.id_estado}>{state.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </AppLayout>
+  );
+}
+
 /* Componente Principal App */
 export default function App() {
   const [initialSession] = useState(() => getStoredSession());
-  const [screen, setScreen] = useState(initialSession ? "home" : "login");
+  const [screen, setScreen] = useState(initialSession ? getLandingScreen(initialSession.user) : "login");
   const [selectedReportId, setSelectedReportId] = useState(null);
-  const [user, setUser] = useState({
-    ...(initialSession?.user || {
-      nombre: "Aisha",
-      apellido: "Gomez",
-      email: "aisha@gmail.com",
-      foto: null,
-      rol: "administrador"
-    })
-  });
+  const [user, setUser] = useState(initialSession?.user || {});
+  const [loginChallenge, setLoginChallenge] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryChallenge, setRecoveryChallenge] = useState("");
+  const [recoveryCode, setRecoveryCode] = useState("");
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryPasswordConfirmation, setRecoveryPasswordConfirmation] = useState("");
+  const [recoverySuccess, setRecoverySuccess] = useState("");
+  const [recoveryCompleted, setRecoveryCompleted] = useState(false);
   const [sessionExpiresAt, setSessionExpiresAt] = useState(initialSession?.expiresAt || null);
+  const [rememberMe, setRememberMe] = useState(initialSession?.remember || false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   const [loginForm, setLoginForm] = useState({ email: "", password: "" });
   const [registerForm, setRegisterForm] = useState({
-    DNI: "",
     nombre: "",
     apellido: "",
     email: "",
@@ -1743,7 +2472,10 @@ export default function App() {
     const refreshUser = async () => {
       try {
         const response = await apiFetch("/auth/usuario");
-        if (active && response.usuario) setUser(response.usuario);
+        if (active && response.usuario) {
+          setUser(response.usuario);
+          setScreen(getLandingScreen(response.usuario));
+        }
       } catch (error) {
         if (!active) return;
         console.error("No se pudo actualizar el usuario de la sesión.", error);
@@ -1764,8 +2496,9 @@ export default function App() {
 
   useEffect(() => {
     if (sessionExpiresAt && sessionExpiresAt > Date.now()) {
-      localStorage.setItem("sac_user", JSON.stringify(user));
-      localStorage.setItem("sac_session_expires_at", String(sessionExpiresAt));
+      const storage = getSessionStorage();
+      storage.setItem("sac_user", JSON.stringify(user));
+      storage.setItem("sac_session_expires_at", String(sessionExpiresAt));
     }
   }, [user, sessionExpiresAt]);
 
@@ -1782,14 +2515,14 @@ export default function App() {
         })
       });
 
-      if (!response.token || !response.usuario) {
-        throw new Error("El servidor no devolvió los datos de inicio de sesión.");
+      if (!response.requiere_verificacion || !response.desafio || !response.email) {
+        throw new Error("El servidor no inició la verificación por correo.");
       }
 
-      localStorage.setItem("sac_token", response.token);
-      setUser(response.usuario);
-      setSessionExpiresAt(Date.now() + SESSION_DURATION_MS);
-      setScreen("home");
+      setLoginChallenge(response.desafio);
+      setVerificationEmail(response.email);
+      setVerificationCode("");
+      setScreen("verify-email");
     } catch (error) {
       console.error("No se pudo iniciar sesión.", error);
       setErrorMessage(error.message || "No se pudo iniciar sesión. Intentá nuevamente.");
@@ -1798,7 +2531,125 @@ export default function App() {
     }
   };
 
+  const handleVerifyCode = async () => {
+    setSubmitting(true);
+    setErrorMessage("");
+    try {
+      const response = await apiFetch("/auth/verificar-codigo", {
+        method: "POST",
+        body: JSON.stringify({ desafio: loginChallenge, codigo: verificationCode })
+      });
+      if (!response.token || !response.usuario) {
+        throw new Error("El servidor no devolvió los datos de inicio de sesión.");
+      }
+
+      clearStoredSession();
+      const storage = rememberMe ? localStorage : sessionStorage;
+      storage.setItem("sac_token", response.token);
+      setUser(response.usuario);
+      setSessionExpiresAt(Date.now() + SESSION_DURATION_MS);
+      setLoginChallenge("");
+      setVerificationCode("");
+      setScreen(getLandingScreen(response.usuario));
+    } catch (error) {
+      console.error("No se pudo verificar el código de inicio de sesión.", error);
+      setErrorMessage(error.message || "No se pudo verificar el código. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRecoveryRequest = async () => {
+    const email = recoveryEmail.trim().toLowerCase();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMessage("Ingresá un correo electrónico válido.");
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage("");
+    setRecoverySuccess("");
+    try {
+      const response = await apiFetch("/auth/solicitar-recuperacion", {
+        method: "POST",
+        body: JSON.stringify({ email })
+      });
+      if (!response.desafio) {
+        throw new Error("No se pudo iniciar la recuperación de contraseña.");
+      }
+      setRecoveryEmail(email);
+      setRecoveryChallenge(response.desafio);
+      setRecoveryCode("");
+      setRecoveryPassword("");
+      setRecoveryPasswordConfirmation("");
+      setRecoverySuccess(response.mensaje || "Si el correo está registrado, recibirás un código.");
+      setRecoveryCompleted(false);
+    } catch (error) {
+      console.error("No se pudo solicitar la recuperación de contraseña.", error);
+      setErrorMessage(error.message || "No se pudo enviar el código. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (!/^\d{6}$/.test(recoveryCode)) {
+      setErrorMessage("Ingresá el código de seis dígitos.");
+      return;
+    }
+    if (recoveryPassword.length < 8 || recoveryPassword.length > 72) {
+      setErrorMessage("La nueva contraseña debe tener entre 8 y 72 caracteres.");
+      return;
+    }
+    if (recoveryPassword !== recoveryPasswordConfirmation) {
+      setErrorMessage("Las contraseñas nuevas no coinciden.");
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage("");
+    setRecoverySuccess("");
+    try {
+      const response = await apiFetch("/auth/restablecer-contrasena", {
+        method: "POST",
+        body: JSON.stringify({
+          desafio: recoveryChallenge,
+          codigo: recoveryCode,
+          contrasena: recoveryPassword
+        })
+      });
+      setRecoverySuccess(response.mensaje || "Contraseña actualizada. Ya podés iniciar sesión.");
+      setRecoveryCompleted(true);
+      setLoginForm((previous) => ({ ...previous, email: recoveryEmail, password: "" }));
+    } catch (error) {
+      console.error("No se pudo restablecer la contraseña.", error);
+      setErrorMessage(error.message || "No se pudo actualizar la contraseña.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleRegisterSubmit = async () => {
+    const nombre = registerForm.nombre.trim();
+    const apellido = registerForm.apellido.trim();
+    const email = registerForm.email.trim();
+    if (nombre.length < 2 || nombre.length > 50) {
+      setErrorMessage("El nombre debe tener entre 2 y 50 caracteres.");
+      return;
+    }
+    if (apellido.length < 2 || apellido.length > 50) {
+      setErrorMessage("El apellido debe tener entre 2 y 50 caracteres.");
+      return;
+    }
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrorMessage("Ingresá un correo válido de hasta 254 caracteres.");
+      return;
+    }
+    if (registerForm.contrasena.length < 8 || registerForm.contrasena.length > 72) {
+      setErrorMessage("La contraseña debe tener entre 8 y 72 caracteres.");
+      return;
+    }
+
     setSubmitting(true);
     setErrorMessage("");
 
@@ -1806,14 +2657,14 @@ export default function App() {
       const response = await apiFetch("/auth/registro", {
         method: "POST",
         body: JSON.stringify({
-          nombre: registerForm.nombre,
-          apellido: registerForm.apellido,
-          email: registerForm.email,
+          nombre,
+          apellido,
+          email,
           contrasena: registerForm.contrasena
         })
       });
       setSuccessMessage(response.mensaje || "¡Cuenta creada con éxito!");
-      setLoginForm((previous) => ({ ...previous, email: registerForm.email, password: "" }));
+      setLoginForm((previous) => ({ ...previous, email, password: "" }));
       setTimeout(() => {
         setScreen("login");
         setSuccessMessage("");
@@ -1829,16 +2680,62 @@ export default function App() {
   const handleLogout = () => {
     clearStoredSession();
     setSessionExpiresAt(null);
+    setLoginChallenge("");
+    setVerificationCode("");
     setScreen("login");
   };
+
+  if (screen === "forgot-password") {
+    return (
+      <ForgotPasswordScreen
+        email={recoveryEmail}
+        setEmail={setRecoveryEmail}
+        challenge={recoveryChallenge}
+        code={recoveryCode}
+        setCode={setRecoveryCode}
+        password={recoveryPassword}
+        setPassword={setRecoveryPassword}
+        passwordConfirmation={recoveryPasswordConfirmation}
+        setPasswordConfirmation={setRecoveryPasswordConfirmation}
+        onRequestCode={handleRecoveryRequest}
+        onResetPassword={handlePasswordReset}
+        onCancel={() => {
+          setRecoveryChallenge("");
+          setRecoveryCode("");
+          setRecoveryPassword("");
+          setRecoveryPasswordConfirmation("");
+          setErrorMessage("");
+          setRecoverySuccess("");
+          setRecoveryCompleted(false);
+          setScreen("login");
+        }}
+        submitting={submitting}
+        errorMessage={errorMessage}
+        successMessage={recoverySuccess}
+        completed={recoveryCompleted}
+      />
+    );
+  }
 
   if (screen === "login") {
     return (
       <Login
         goRegister={() => { setScreen("register"); setErrorMessage(""); }}
-        goHome={handleLoginSubmit}
+        goContact={() => {
+          setRecoveryEmail(loginForm.email);
+          setRecoveryChallenge("");
+          setRecoveryCode("");
+          setRecoveryPassword("");
+          setRecoverySuccess("");
+          setRecoveryCompleted(false);
+          setErrorMessage("");
+          setScreen("forgot-password");
+        }}
+        onSubmit={handleLoginSubmit}
         loginForm={loginForm}
         setLoginForm={setLoginForm}
+        rememberMe={rememberMe}
+        setRememberMe={setRememberMe}
         submitting={submitting}
         errorMessage={errorMessage}
       />
@@ -1859,19 +2756,43 @@ export default function App() {
     );
   }
 
+  if (screen === "verify-email") {
+    return (
+      <EmailCodeVerification
+        email={verificationEmail}
+        code={verificationCode}
+        setCode={setVerificationCode}
+        onSubmit={handleVerifyCode}
+        onCancel={() => {
+          setLoginChallenge("");
+          setVerificationCode("");
+          setErrorMessage("");
+          setScreen("login");
+        }}
+        submitting={submitting}
+        errorMessage={errorMessage}
+      />
+    );
+  }
+
+  if (isMunicipalArea(user)) {
+    return <MunicipalScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  }
+
   if (screen === "home") return <Dashboard navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "reportar-form") return <ReportForm navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "mis-reportes") return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} setSelectedReportId={setSelectedReportId} />;
-  if (screen === "mapa") return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
+  if (screen === "mapa") return <MapScreen navigateTo={setScreen} user={user} onLogout={handleLogout} onOpenReport={setSelectedReportId} />;
   if (screen === "detalle-reporte") {
     if (selectedReportId) {
-      return <ReportDetail navigateTo={setScreen} user={user} onLogout={handleLogout} reportId={selectedReportId} />;
+      return <ReportDetail key={selectedReportId} navigateTo={setScreen} user={user} onLogout={handleLogout} reportId={selectedReportId} />;
     }
     return <MyReports navigateTo={setScreen} user={user} onLogout={handleLogout} setSelectedReportId={setSelectedReportId} />;
   }
   if (screen === "notificaciones") return <NotificationsScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "guia-uso") return <GuiaUsoScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "perfil") return <ProfileScreen navigateTo={setScreen} user={user} setUser={setUser} onLogout={handleLogout} />;
+  if (screen === "contacto") return <ContactScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "cambiar-contrasena") return <ChangePasswordScreen navigateTo={setScreen} user={user} onLogout={handleLogout} />;
   if (screen === "admin") {
     if (isAdministrator(user)) {
@@ -1883,9 +2804,12 @@ export default function App() {
   return (
     <Login
       goRegister={() => setScreen("register")}
-      goHome={handleLoginSubmit}
+      goContact={() => setScreen("forgot-password")}
+      onSubmit={handleLoginSubmit}
       loginForm={loginForm}
       setLoginForm={setLoginForm}
+      rememberMe={rememberMe}
+      setRememberMe={setRememberMe}
       submitting={submitting}
       errorMessage={errorMessage}
     />

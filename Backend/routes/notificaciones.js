@@ -1,14 +1,15 @@
 const express = require("express");
 
 const conexion = require("../db");
-const { verificarToken } =
+const { verificarToken, verificarRol } =
     require("../middleware/auth");
 
 const router = express.Router();
+const verificarVecino = verificarRol("vecino");
 
 
 // Obtener notificaciones
-router.get("/", verificarToken, async (req, res) => {
+router.get("/", verificarToken, verificarVecino, async (req, res) => {
 
     try {
 
@@ -40,7 +41,7 @@ router.get("/", verificarToken, async (req, res) => {
 
 
 // Marcar todas como leídas
-router.put("/leer", verificarToken, async (req, res) => {
+router.put("/leer", verificarToken, verificarVecino, async (req, res) => {
 
     try {
 

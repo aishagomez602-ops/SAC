@@ -2,6 +2,8 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
 
+const apiPort = Number(process.env.SAC_API_PORT) || 3001
+
 export default defineConfig({
   plugins: [
     react(),
@@ -12,11 +14,11 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${apiPort}`,
         changeOrigin: true,
       },
       '/uploads': {
-        target: 'http://localhost:3001',
+        target: `http://localhost:${apiPort}`,
         changeOrigin: true,
       }
     }

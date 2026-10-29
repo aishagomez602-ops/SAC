@@ -6,10 +6,13 @@ const crypto = require("crypto");
 
 const conexion = require("../db");
 const {
-    verificarToken
+    verificarToken,
+    verificarRol
 } = require("../middleware/auth");
 
 const router = express.Router();
+const verificarVecino = verificarRol("vecino");
+const verificarVecinoOAdministrador = verificarRol("vecino", "administrador");
 
 
 // ========================================
@@ -58,6 +61,7 @@ const subirFoto = multer({
 router.post(
     "/crear",
     verificarToken,
+    verificarVecino,
     subirFoto.single("foto"),
     async (req, res) => {
         let connection;
@@ -71,17 +75,38 @@ router.post(
                 latitud,
                 longitud
             } = req.body;
+            const tituloLimpio = typeof titulo === "string" ? titulo.trim() : "";
+            const descripcionLimpia = typeof descripcion === "string" ? descripcion.trim() : "";
+            const direccionLimpia = typeof direccion === "string" ? direccion.trim() : "";
+            const categoriaId = Number(id_categoria);
+            const latitude = latitud === undefined || latitud === "" ? null : Number(latitud);
+            const longitude = longitud === undefined || longitud === "" ? null : Number(longitud);
 
             if (
-                !id_categoria ||
-                !titulo ||
-                !descripcion ||
-                !direccion
+                !Number.isInteger(categoriaId) ||
+                categoriaId <= 0 ||
+                tituloLimpio.length < 5 ||
+                tituloLimpio.length > 100 ||
+                descripcionLimpia.length < 20 ||
+                descripcionLimpia.length > 1000 ||
+                direccionLimpia.length < 5 ||
+                direccionLimpia.length > 150 ||
+                (latitude === null) !== (longitude === null) ||
+                (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
+                (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))
             ) {
+                if (req.file) {
+                    try {
+                        await fs.promises.unlink(req.file.path);
+                    } catch (cleanupError) {
+                        if (cleanupError.code !== "ENOENT") {
+                            console.error("No se pudo limpiar la foto del reporte inválido.", cleanupError);
+                        }
+                    }
+                }
                 return res.status(400).json({
                     ok: false,
-                    mensaje:
-                        "Completá todos los datos del reporte"
+                    mensaje: "La categoría es obligatoria; el título debe tener 5–100, la descripción 20–1000 y la dirección 5–150 caracteres"
                 });
             }
 
@@ -112,12 +137,12 @@ router.post(
                     VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)`,
                     [
                         req.usuario.id_usuario,
-                        id_categoria,
-                        titulo,
-                        descripcion,
-                        direccion,
-                        latitud || null,
-                        longitud || null,
+                        categoriaId,
+                        tituloLimpio,
+                        descripcionLimpia,
+                        direccionLimpia,
+                        latitude,
+                        longitude,
                         foto
                     ]
                 );
@@ -161,6 +186,7 @@ router.post(
 router.get(
     "/todos",
     verificarToken,
+    verificarVecinoOAdministrador,
     async (req, res) => {
 
         try {
@@ -242,6 +268,7 @@ router.get(
 router.get(
     "/mis-reportes",
     verificarToken,
+    verificarVecinoOAdministrador,
     async (req, res) => {
 
         try {
@@ -314,6 +341,7 @@ router.get(
 router.get(
     "/:id",
     verificarToken,
+    verificarVecinoOAdministrador,
     async (req, res) => {
 
         try {
@@ -361,32 +389,6 @@ router.get(
                 });
             }
 
-            const [comentarios] =
-                await conexion.query(
-                    `SELECT
-                        c.id_comentario,
-                        c.comentario,
-                        c.fecha_comentario,
-
-                        CONCAT(
-                            u.nombre,
-                            ' ',
-                            u.apellido
-                        ) AS usuario
-
-                    FROM comentarios c
-
-                    INNER JOIN usuarios u
-                        ON c.id_usuario =
-                        u.id_usuario
-
-                    WHERE c.id_reporte = ?
-
-                    ORDER BY
-                        c.fecha_comentario ASC`,
-                    [id]
-                );
-
             const [apoyos] =
                 await conexion.query(
                     `SELECT COUNT(*) AS cantidad
@@ -395,11 +397,20 @@ router.get(
                     [id]
                 );
 
+            const [miApoyo] =
+                await conexion.query(
+                    `SELECT id_apoyo
+                     FROM apoyos
+                     WHERE id_reporte = ?
+                     AND id_usuario = ?`,
+                    [id, req.usuario.id_usuario]
+                );
+
             res.json({
                 ok: true,
                 reporte: reportes[0],
-                comentarios,
-                apoyos: apoyos[0].cantidad
+                apoyos: apoyos[0].cantidad,
+                apoyado: miApoyo.length > 0
             });
 
         } catch (error) {
@@ -423,6 +434,7 @@ router.get(
 router.post(
     "/:id/apoyar",
     verificarToken,
+    verificarVecino,
     async (req, res) => {
 
         try {
@@ -493,66 +505,6 @@ router.post(
     }
 );
 
-
-// ========================================
-// COMENTAR
-// ========================================
-
-router.post(
-    "/:id/comentarios",
-    verificarToken,
-    async (req, res) => {
-
-        try {
-
-            const idReporte =
-                req.params.id;
-
-            const comentario =
-                req.body.comentario;
-
-            if (!comentario) {
-
-                return res.status(400).json({
-                    ok: false,
-                    mensaje:
-                        "Escribí un comentario"
-                });
-            }
-
-            await conexion.query(
-                `INSERT INTO comentarios
-                (
-                    id_reporte,
-                    id_usuario,
-                    comentario
-                )
-                VALUES (?, ?, ?)`,
-                [
-                    idReporte,
-                    req.usuario.id_usuario,
-                    comentario
-                ]
-            );
-
-            res.json({
-                ok: true,
-                mensaje:
-                    "Comentario agregado"
-            });
-
-        } catch (error) {
-
-            console.error(error);
-
-            res.status(500).json({
-                ok: false,
-                mensaje:
-                    "No se pudo agregar el comentario"
-            });
-        }
-    }
-);
 
 router.use((error, req, res, next) => {
     if (error instanceof multer.MulterError) {
