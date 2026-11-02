@@ -5,16 +5,10 @@ const crypto = require("crypto");
 
 const conexion = require("../db");
 const { verificarToken } = require("../middleware/auth");
-const { enviarCodigoInicioSesion, enviarCodigoRecuperacion } = require("../email");
+const { enviarCodigoRecuperacion } = require("../email");
+const { esContrasenaSegura } = require("../password-validation");
 
 const router = express.Router();
-
-function hashCodigo(desafio, codigo) {
-    return crypto
-        .createHmac("sha256", process.env.JWT_SECRET)
-        .update(`${desafio}:${codigo}`)
-        .digest("hex");
-}
 
 // ===============================
 // REGISTRO
@@ -41,14 +35,11 @@ router.post("/registro", async (req, res) => {
             apellidoLimpio.length > 50 ||
             emailLimpio.length > 254 ||
             !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailLimpio) ||
-            typeof contrasena !== "string" ||
-            contrasena.length < 8 ||
-            contrasena.length > 72 ||
-            Buffer.byteLength(contrasena, "utf8") > 72
+            !esContrasenaSegura(contrasena)
         ) {
             return res.status(400).json({
                 ok: false,
-                mensaje: "El nombre y apellido deben tener 2–50 caracteres; el correo debe ser válido y la contraseña debe tener 8–72 caracteres"
+                mensaje: "El nombre y apellido deben tener 2–50 caracteres, el correo debe ser válido y la contraseña debe tener 12–72 caracteres, mayúscula, minúscula, número y símbolo"
             });
         }
 
@@ -161,60 +152,30 @@ router.post("/login", async (req, res) => {
             });
         }
 
-        const [desafiosAnteriores] = await conexion.query(
-            `SELECT creado_en
-             FROM desafios_acceso
-             WHERE id_usuario = ?
-             ORDER BY creado_en DESC
-             LIMIT 1`,
-            [usuario.id_usuario]
+        const usuarioAutenticado = {
+            id_usuario: usuario.id_usuario,
+            email: usuario.email,
+            nombre: usuario.nombre,
+            apellido: usuario.apellido,
+            foto: usuario.foto,
+            rol: usuario.rol,
+            fecha_registro: usuario.fecha_registro
+        };
+        const token = jwt.sign(
+            {
+                id_usuario: usuarioAutenticado.id_usuario,
+                email: usuarioAutenticado.email,
+                rol: usuarioAutenticado.rol
+            },
+            process.env.JWT_SECRET,
+            { expiresIn: "30d" }
         );
-        if (
-            desafiosAnteriores.length > 0 &&
-            Date.now() - new Date(desafiosAnteriores[0].creado_en).getTime() < 60_000
-        ) {
-            return res.status(429).json({
-                ok: false,
-                mensaje: "Esperá un minuto antes de solicitar otro código"
-            });
-        }
-
-        await conexion.query(
-            "DELETE FROM desafios_acceso WHERE id_usuario = ?",
-            [usuario.id_usuario]
-        );
-
-        const desafio = crypto.randomBytes(32).toString("hex");
-        const codigo = crypto.randomInt(100000, 1000000).toString();
-        await conexion.query(
-            `INSERT INTO desafios_acceso (id_desafio, id_usuario, codigo_hash, vence_en)
-             VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 10 MINUTE))`,
-            [
-                crypto.createHash("sha256").update(desafio).digest("hex"),
-                usuario.id_usuario,
-                hashCodigo(desafio, codigo)
-            ]
-        );
-
-        try {
-            await enviarCodigoInicioSesion(usuario.email, codigo);
-        } catch (error) {
-            await conexion.query("DELETE FROM desafios_acceso WHERE id_desafio = ?", [
-                crypto.createHash("sha256").update(desafio).digest("hex")
-            ]);
-            console.error("No se pudo enviar el código de inicio de sesión.", error.message);
-            return res.status(503).json({
-                ok: false,
-                mensaje: "No se pudo enviar el código por correo. Revisá la configuración del servicio de email e intentá nuevamente."
-            });
-        }
 
         return res.json({
             ok: true,
-            mensaje: "Te enviamos un código de verificación a tu correo",
-            requiere_verificacion: true,
-            desafio,
-            email: usuario.email
+            mensaje: "Inicio de sesión correcto",
+            token,
+            usuario: usuarioAutenticado
         });
 
     } catch (error) {
@@ -225,115 +186,6 @@ router.post("/login", async (req, res) => {
             ok: false,
             mensaje: "Error en el servidor"
         });
-    }
-});
-
-router.post("/verificar-codigo", async (req, res) => {
-    const desafio = typeof req.body.desafio === "string" ? req.body.desafio : "";
-    const codigo = typeof req.body.codigo === "string" ? req.body.codigo.trim() : "";
-    if (!/^[a-f0-9]{64}$/i.test(desafio) || !/^\d{6}$/.test(codigo)) {
-        return res.status(400).json({
-            ok: false,
-            mensaje: "Ingresá el código de seis dígitos que recibiste por correo"
-        });
-    }
-
-    let connection;
-    try {
-        connection = await conexion.getConnection();
-        await connection.beginTransaction();
-
-        const idDesafio = crypto.createHash("sha256").update(desafio).digest("hex");
-        const [desafios] = await connection.query(
-            `SELECT d.id_desafio, d.id_usuario, d.codigo_hash, d.intentos, d.vence_en,
-                    u.email, u.nombre, u.apellido, u.foto, u.rol, u.fecha_registro
-             FROM desafios_acceso d
-             INNER JOIN usuarios u ON u.id_usuario = d.id_usuario
-             WHERE d.id_desafio = ?
-             FOR UPDATE`,
-            [idDesafio]
-        );
-
-        if (desafios.length === 0) {
-            await connection.rollback();
-            return res.status(401).json({
-                ok: false,
-                mensaje: "El código venció o ya fue utilizado. Iniciá sesión nuevamente."
-            });
-        }
-
-        const desafioActual = desafios[0];
-        if (new Date(desafioActual.vence_en).getTime() <= Date.now()) {
-            await connection.query("DELETE FROM desafios_acceso WHERE id_desafio = ?", [idDesafio]);
-            await connection.commit();
-            return res.status(401).json({
-                ok: false,
-                mensaje: "El código venció. Iniciá sesión nuevamente."
-            });
-        }
-
-        const codigoEsperado = Buffer.from(desafioActual.codigo_hash, "hex");
-        const codigoRecibido = Buffer.from(hashCodigo(desafio, codigo), "hex");
-        const codigoCorrecto =
-            codigoEsperado.length === codigoRecibido.length &&
-            crypto.timingSafeEqual(codigoEsperado, codigoRecibido);
-
-        if (!codigoCorrecto) {
-            const intentos = desafioActual.intentos + 1;
-            if (intentos >= 5) {
-                await connection.query("DELETE FROM desafios_acceso WHERE id_desafio = ?", [idDesafio]);
-            } else {
-                await connection.query(
-                    "UPDATE desafios_acceso SET intentos = ? WHERE id_desafio = ?",
-                    [intentos, idDesafio]
-                );
-            }
-            await connection.commit();
-            return res.status(401).json({
-                ok: false,
-                mensaje: intentos >= 5
-                    ? "Se agotaron los intentos. Iniciá sesión nuevamente."
-                    : `El código es incorrecto. Te quedan ${5 - intentos} intentos.`
-            });
-        }
-
-        await connection.query("DELETE FROM desafios_acceso WHERE id_desafio = ?", [idDesafio]);
-        await connection.commit();
-
-        const usuario = {
-            id_usuario: desafioActual.id_usuario,
-            email: desafioActual.email,
-            nombre: desafioActual.nombre,
-            apellido: desafioActual.apellido,
-            foto: desafioActual.foto,
-            rol: desafioActual.rol,
-            fecha_registro: desafioActual.fecha_registro
-        };
-        const token = jwt.sign(
-            {
-                id_usuario: usuario.id_usuario,
-                email: usuario.email,
-                rol: usuario.rol
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: "30d" }
-        );
-
-        return res.json({
-            ok: true,
-            mensaje: "Inicio de sesión confirmado",
-            token,
-            usuario
-        });
-    } catch (error) {
-        if (connection) await connection.rollback();
-        console.error(error);
-        return res.status(500).json({
-            ok: false,
-            mensaje: "No se pudo verificar el código"
-        });
-    } finally {
-        if (connection) connection.release();
     }
 });
 
@@ -433,13 +285,11 @@ router.post("/restablecer-contrasena", async (req, res) => {
     if (
         !/^[a-f0-9]{64}$/i.test(desafio) ||
         !/^\d{6}$/.test(codigo) ||
-        contrasena.length < 8 ||
-        contrasena.length > 72 ||
-        Buffer.byteLength(contrasena, "utf8") > 72
+        !esContrasenaSegura(contrasena)
     ) {
         return res.status(400).json({
             ok: false,
-            mensaje: "Ingresá un código válido y una nueva contraseña de 8–72 caracteres"
+            mensaje: "Ingresá un código válido y una contraseña segura de 12–72 caracteres, con mayúscula, minúscula, número y símbolo"
         });
     }
 

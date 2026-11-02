@@ -89,8 +89,9 @@ router.post(
                 tituloLimpio.length > 100 ||
                 descripcionLimpia.length < 20 ||
                 descripcionLimpia.length > 1000 ||
-                direccionLimpia.length < 5 ||
+                (direccionLimpia.length > 0 && direccionLimpia.length < 3) ||
                 direccionLimpia.length > 150 ||
+                (!direccionLimpia && latitude === null) ||
                 (latitude === null) !== (longitude === null) ||
                 (latitude !== null && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90)) ||
                 (longitude !== null && (!Number.isFinite(longitude) || longitude < -180 || longitude > 180))
@@ -106,7 +107,7 @@ router.post(
                 }
                 return res.status(400).json({
                     ok: false,
-                    mensaje: "La categoría es obligatoria; el título debe tener 5–100, la descripción 20–1000 y la dirección 5–150 caracteres"
+                    mensaje: "La categoría es obligatoria; el título debe tener 5–100, la descripción 20–1000 y la dirección al menos 3 caracteres o coordenadas GPS válidas"
                 });
             }
 

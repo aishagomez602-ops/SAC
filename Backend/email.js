@@ -30,15 +30,6 @@ async function enviarCorreoCodigo(email, codigo, subject, purpose) {
     });
 }
 
-function enviarCodigoInicioSesion(email, codigo) {
-    return enviarCorreoCodigo(
-        email,
-        codigo,
-        "Código para iniciar sesión en S.A.C.",
-        "iniciar sesión"
-    );
-}
-
 function enviarCodigoRecuperacion(email, codigo) {
     return enviarCorreoCodigo(
         email,
@@ -48,4 +39,4 @@ function enviarCodigoRecuperacion(email, codigo) {
     );
 }
 
-module.exports = { enviarCodigoInicioSesion, enviarCodigoRecuperacion };
+module.exports = { enviarCodigoRecuperacion };

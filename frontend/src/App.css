@@ -299,6 +299,35 @@ button {
   border-radius: 5px;
 }
 
+.password-requirements {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 5px 12px;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 11px;
+  list-style: none;
+}
+
+.password-requirements li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.password-requirements li span {
+  color: #b45309;
+  font-weight: 800;
+}
+
+.password-requirements .password-requirement-met,
+.password-requirements .password-requirement-met span {
+  color: #15803d;
+}
+
 .register-card .field-icon {
   width: 36px;
 }
@@ -2613,27 +2642,56 @@ button {
 .sac-social-title {
   font-size: 13px;
   font-weight: 800;
-  margin: 24px 0 12px 0;
+  margin: 24px 0 8px 0;
   color: var(--text);
+}
+
+.sac-contact-social-description {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .sac-social-links-row {
   display: flex;
-  gap: 30px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+  margin-bottom: 24px;
 }
 
 .sac-social-item {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   text-decoration: none;
   font-size: 12px;
   font-weight: 700;
   color: var(--text);
+  transition: color .2s, transform .2s;
 }
 
 .sac-social-item:hover {
   color: var(--orange-dark);
+  transform: translateY(-1px);
+}
+
+.sac-social-item:focus-visible {
+  outline: 3px solid rgba(249, 115, 22, .35);
+  outline-offset: 3px;
+}
+
+.sac-social-brand-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+}
+
+.sac-social-brand-icon-x {
+  color: #171717;
 }

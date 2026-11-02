@@ -3,6 +3,36 @@ import "./App.css";
 
 const API_URL = "/api";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
+const PASSWORD_MIN_LENGTH = 12;
+
+function getPasswordRequirements(password) {
+  const byteLength = new TextEncoder().encode(password).length;
+  return [
+    { label: "Entre 12 y 72 caracteres", met: password.length >= PASSWORD_MIN_LENGTH && password.length <= 72 },
+    { label: "Al menos una mayúscula", met: /\p{Lu}/u.test(password) },
+    { label: "Al menos una minúscula", met: /\p{Ll}/u.test(password) },
+    { label: "Al menos un número", met: /\p{N}/u.test(password) },
+    { label: "Al menos un símbolo (no cuenta el espacio)", met: /[^\p{L}\p{N}\s]/u.test(password) },
+    { label: "Máximo 72 bytes", met: byteLength <= 72 }
+  ];
+}
+
+function PasswordRequirements({ password }) {
+  return (
+    <ul className="password-requirements" aria-label="Requisitos de contraseña">
+      {getPasswordRequirements(password).map(({ label, met }) => (
+        <li className={met ? "password-requirement-met" : ""} key={label}>
+          <span aria-hidden="true">{met ? "✓" : "○"}</span>
+          {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function isStrongPassword(password) {
+  return getPasswordRequirements(password).every(({ met }) => met);
+}
 
 function clearStoredSession() {
   for (const storage of [localStorage, sessionStorage]) {
@@ -144,6 +174,15 @@ function getReportPhotoUrl(photo) {
 }
 
 function getReportLocation(report) {
+  const address = String(report.direccion || "").trim();
+  const isLegacyGpsLabel = /^mi ubicación\s*\(-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?\)$/i.test(address);
+  if (address && !isLegacyGpsLabel) {
+    return {
+      query: `${address}, Benito Juárez, Buenos Aires, Argentina`,
+      searchText: address
+    };
+  }
+
   const latitud = Number(report.latitud);
   const longitud = Number(report.longitud);
   const hasCoordinates = report.latitud !== null
@@ -158,13 +197,14 @@ function getReportLocation(report) {
     && longitud <= 180;
 
   if (hasCoordinates) {
-    return { query: `${latitud},${longitud}`, exact: true };
+    const coordinates = `${latitud},${longitud}`;
+    return { query: coordinates, searchText: coordinates };
   }
 
-  const address = String(report.direccion || "").trim();
+  const fallback = "Benito Juárez, Buenos Aires, Argentina";
   return {
-    query: address ? `${address}, Benito Juárez, Buenos Aires, Argentina` : "Benito Juárez, Buenos Aires, Argentina",
-    exact: false
+    query: fallback,
+    searchText: fallback
   };
 }
 
@@ -363,14 +403,15 @@ function ForgotPasswordScreen({
                   icon="lock"
                   name="nueva-contrasena"
                   type="password"
-                  placeholder="Nueva contraseña (8 a 72 caracteres)"
+                  placeholder="Nueva contraseña (12 a 72 caracteres)"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={PASSWORD_MIN_LENGTH}
                   maxLength={72}
                   required
                 />
+                <PasswordRequirements password={password} />
                 <Field
                   icon="lock"
                   name="confirmar-nueva-contrasena"
@@ -379,7 +420,7 @@ function ForgotPasswordScreen({
                   value={passwordConfirmation}
                   onChange={(event) => setPasswordConfirmation(event.target.value)}
                   autoComplete="new-password"
-                  minLength={8}
+                  minLength={PASSWORD_MIN_LENGTH}
                   maxLength={72}
                   required
                 />
@@ -392,7 +433,7 @@ function ForgotPasswordScreen({
               <button
                 className="primary-button"
                 type="submit"
-                disabled={submitting || (!requestingCode && (code.length !== 6 || password.length < 8 || !passwordsMatch))}
+                disabled={submitting || (!requestingCode && (code.length !== 6 || !isStrongPassword(password) || !passwordsMatch))}
               >
                 {submitting
                   ? (requestingCode ? "Enviando código..." : "Actualizando contraseña...")
@@ -406,49 +447,6 @@ function ForgotPasswordScreen({
         </section>
       </main>
       <span className="page-number">S.A.C. - Recuperar contraseña</span>
-    </div>
-  );
-}
-
-function EmailCodeVerification({ email, code, setCode, onSubmit, onCancel, submitting, errorMessage }) {
-  return (
-    <div className="page">
-      <div className="decoration top-left" />
-      <div className="decoration bottom-right" />
-      <main className="layout login-layout">
-        <section className="presentation">
-          <Logo />
-          <h1>Un último paso<br /><strong>para ingresar</strong></h1>
-          <p>Protegemos tu cuenta con una confirmación por correo.</p>
-        </section>
-        <section className="card login-card">
-          <h2>Confirmá tu correo</h2>
-          <p className="card-description">Ingresá el código que enviamos a {email}.</p>
-          <form onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-            <Field
-              icon="lock"
-              name="codigo"
-              placeholder="Código de 6 dígitos"
-              value={code}
-              onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-              autoComplete="one-time-code"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              minLength={6}
-              required
-            />
-            {errorMessage && <p className="error-message" role="alert">{errorMessage}</p>}
-            <button className="primary-button" type="submit" disabled={submitting || code.length !== 6}>
-              {submitting ? "Verificando..." : "Confirmar e ingresar"}
-            </button>
-          </form>
-          <button className="login-link" onClick={onCancel} type="button" disabled={submitting}>
-            Volver al inicio de sesión
-          </button>
-        </section>
-      </main>
-      <span className="page-number">S.A.C. - Verificación</span>
     </div>
   );
 }
@@ -479,7 +477,8 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
             <Field icon="user" name="nombre" placeholder="Nombre (2 a 50 caracteres)" value={registerForm.nombre} onChange={handleChange} autoComplete="given-name" minLength={2} maxLength={50} required />
             <Field icon="user" name="apellido" placeholder="Apellido (2 a 50 caracteres)" value={registerForm.apellido} onChange={handleChange} autoComplete="family-name" minLength={2} maxLength={50} required />
             <Field icon="mail" name="email" placeholder="Correo electrónico" type="email" value={registerForm.email} onChange={handleChange} autoComplete="email" maxLength={254} required />
-            <Field icon="lock" name="contrasena" type="password" placeholder="Contraseña (8 a 72 caracteres)" value={registerForm.contrasena} onChange={handleChange} autoComplete="new-password" minLength={8} maxLength={72} required />
+            <Field icon="lock" name="contrasena" type="password" placeholder="Contraseña segura (12 a 72 caracteres)" value={registerForm.contrasena} onChange={handleChange} autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} maxLength={72} required />
+            <PasswordRequirements password={registerForm.contrasena} />
 
             {errorMessage && <p className="error-message">{errorMessage}</p>}
             {successMessage && <p className="success-message">{successMessage}</p>}
@@ -699,6 +698,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
   const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
+  const [numeroCasa, setNumeroCasa] = useState("");
   const [coordenadas, setCoordenadas] = useState(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
@@ -748,7 +748,6 @@ function ReportForm({ navigateTo, user, onLogout }) {
           longitud: coords.longitude
         };
         setCoordenadas(currentCoordinates);
-        setUbicacion(`Mi ubicación (${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)})`);
         setLoadingLocation(false);
       },
       (error) => {
@@ -791,16 +790,24 @@ function ReportForm({ navigateTo, user, onLogout }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    const direccionIngresada = ubicacion.trim();
+    const alturaIngresada = numeroCasa.trim();
+    const direccionCompleta = alturaIngresada
+      ? `${direccionIngresada} ${alturaIngresada}`
+      : direccionIngresada;
+    const tieneCoordenadas = Boolean(coordenadas);
     if (
       !categoria ||
       titulo.trim().length < 5 ||
       titulo.trim().length > 100 ||
       descripcion.trim().length < 20 ||
       descripcion.trim().length > 1000 ||
-      ubicacion.trim().length < 5 ||
-      ubicacion.trim().length > 150
+      (direccionIngresada.length > 0 && (direccionIngresada.length < 3 || direccionCompleta.length > 150)) ||
+      (!direccionIngresada && !tieneCoordenadas) ||
+      (alturaIngresada.length > 20 ||
+        (alturaIngresada && (!direccionIngresada || !/^[\p{L}\p{N}][\p{L}\p{N}\s/-]{0,19}$/u.test(alturaIngresada))))
     ) {
-      setReportSaveError("Revisá los límites: título 5–100, descripción 20–1000 y dirección 5–150 caracteres.");
+      setReportSaveError("Ingresá una dirección de al menos 3 caracteres o usá el GPS. Si agregás una altura, escribila junto a una dirección. El título admite 5–100 caracteres y la descripción 20–1000.");
       return;
     }
     setReportSaveError("");
@@ -810,7 +817,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
     formData.append("id_categoria", categoria);
     formData.append("titulo", titulo.trim());
     formData.append("descripcion", descripcion.trim());
-    formData.append("direccion", ubicacion.trim());
+    formData.append("direccion", direccionCompleta);
     if (coordenadas) {
       formData.append("latitud", String(coordenadas.latitud));
       formData.append("longitud", String(coordenadas.longitud));
@@ -889,26 +896,36 @@ function ReportForm({ navigateTo, user, onLogout }) {
               id="reporte-ubicacion"
               className="sac-input"
               type="text"
-              placeholder="Ingresá una dirección o usá tu ubicación actual"
+              placeholder="Ingresá calle, esquina o referencia"
               value={ubicacion}
-              minLength={5}
-              maxLength={150}
+              minLength={3}
+              maxLength={130}
               onChange={(event) => {
                 setUbicacion(event.target.value);
                 setCoordenadas(null);
               }}
-              required
+              required={!coordenadas}
+            />
+            <label className="sac-label" htmlFor="reporte-altura">Número de casa / altura (opcional)</label>
+            <input
+              id="reporte-altura"
+              className="sac-input"
+              type="text"
+              placeholder="Ej.: 123 o 123 B"
+              value={numeroCasa}
+              maxLength={20}
+              onChange={(event) => setNumeroCasa(event.target.value)}
             />
             <button className="sac-location-btn" onClick={handleGetLocation} type="button" disabled={loadingLocation}>
               <Icon type="pin" size={16} />
               {loadingLocation ? "Obteniendo ubicación..." : "Usar mi ubicación actual"}
             </button>
             <p className="sac-location-description">
-              El navegador te pedirá permiso para compartir tu ubicación. Si no querés habilitarla, podés escribir la dirección.
+              Indicá la calle y la altura para ubicar el domicilio con precisión, o usá el GPS como alternativa.
             </p>
             {coordenadas && (
               <p className="sac-location-coordinates">
-                Ubicación guardada: {coordenadas.latitud.toFixed(5)}, {coordenadas.longitud.toFixed(5)}
+                Se usarán las coordenadas del GPS si no ingresás una dirección.
               </p>
             )}
             {locationError && <p className="error-message" role="alert">{locationError}</p>}
@@ -1066,7 +1083,11 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
             <ReportPhoto className="sac-report-thumb" photo={item.foto} alt={`Foto del reporte ${item.titulo}`} />
             <div className="sac-report-info">
               <h3>{item.titulo}</h3>
-              <p>{item.direccion} • {item.fecha_reporte ? new Date(item.fecha_reporte).toLocaleDateString("es-AR") : ""}</p>
+              <p>
+                {item.direccion || (item.latitud != null && item.longitud != null ? "Ubicación por GPS" : "Ubicación no informada")}
+                {" • "}
+                {item.fecha_reporte ? new Date(item.fecha_reporte).toLocaleDateString("es-AR") : ""}
+              </p>
               {item.estado_revision === "pendiente" && <span className="sac-review-status pendiente">En revisión administrativa</span>}
               {item.estado_revision === "rechazado" && <span className="sac-review-status rechazado">No aprobado para publicación</span>}
             </div>
@@ -1081,6 +1102,7 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
 /* Pantalla 6: Mapa */
 function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
   const [searchText, setSearchText] = useState("Benito Juárez, Buenos Aires, Argentina");
+  const [searchError, setSearchError] = useState("");
   const [mapLocation, setMapLocation] = useState("Benito Juárez, Buenos Aires, Argentina");
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [reports, setReports] = useState([]);
@@ -1112,16 +1134,19 @@ function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
   const handleSearch = (event) => {
     event.preventDefault();
     const location = searchText.trim();
-    if (location) {
-      setMapLocation(location);
-      setSelectedReportId(null);
+    if (location.length < 3 || location.length > 150) {
+      setSearchError("Ingresá una ubicación de entre 3 y 150 caracteres.");
+      return;
     }
+    setSearchError("");
+    setMapLocation(location);
+    setSelectedReportId(null);
   };
 
   const handleSelectReport = (report) => {
     const location = getReportLocation(report);
     setMapLocation(location.query);
-    setSearchText(location.exact ? report.direccion : location.query);
+    setSearchText(location.searchText);
     setSelectedReportId(report.id_reporte);
     onOpenReport(report.id_reporte);
     mapCanvasRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -1147,12 +1172,19 @@ function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
             className="sac-map-search-input"
             type="search"
             value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
+            onChange={(event) => {
+              setSearchText(event.target.value);
+              setSearchError("");
+            }}
             placeholder="Ej.: Calle 12 y 5, localidad"
             aria-label="Buscar una dirección o localidad en el mapa"
+            minLength={3}
+            maxLength={150}
+            required
           />
           <button className="sac-map-link sac-map-search-button" type="submit">Buscar en el mapa</button>
         </div>
+        {searchError && <p className="error-message" role="alert">{searchError}</p>}
       </form>
 
       <div className="sac-map-canvas" ref={mapCanvasRef}>
@@ -1204,7 +1236,9 @@ function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
                   : <span className="sac-map-report-pin"><Icon type="pin" size={19} /></span>}
                 <span className="sac-map-report-details">
                   <strong>{report.titulo}</strong>
-                  <span className="sac-map-report-location">{report.direccion || "Ubicación no informada"}</span>
+                  <span className="sac-map-report-location">
+                    {report.direccion || (report.latitud != null && report.longitud != null ? "Ubicación por GPS" : "Ubicación no informada")}
+                  </span>
                   <span className="sac-map-report-date">{report.fecha_reporte ? new Date(report.fecha_reporte).toLocaleDateString("es-AR") : ""}</span>
                   <span className="sac-map-report-date">Seleccioná para ubicarlo en el mapa</span>
                 </span>
@@ -1620,7 +1654,7 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
         <form className="sac-form-container" onSubmit={handleSaveProfile}>
           <div className="sac-form-group">
             <label className="sac-label" htmlFor="perfil-foto">Foto de perfil</label>
-            <input id="perfil-foto" type="file" accept="image/*" onChange={handlePhotoChange} className="sac-file-input" />
+            <input id="perfil-foto" type="file" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handlePhotoChange} className="sac-file-input" />
             <label className="sac-profile-upload" htmlFor="perfil-foto">
               <span className="sac-profile-upload-preview">
                 {profileDraft.foto ? <img src={profileDraft.foto} alt="" /> : <Icon type="user" size={22} />}
@@ -1633,16 +1667,16 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
             </label>
           </div>
           <div className="sac-form-group">
-            <label className="sac-label">Nombre</label>
-            <input type="text" className="sac-input" value={profileDraft.nombre} onChange={(e) => setProfileDraft((current) => ({ ...current, nombre: e.target.value }))} minLength={2} maxLength={50} required />
+            <label className="sac-label" htmlFor="perfil-nombre">Nombre</label>
+            <input id="perfil-nombre" type="text" className="sac-input" value={profileDraft.nombre} onChange={(e) => setProfileDraft((current) => ({ ...current, nombre: e.target.value }))} minLength={2} maxLength={50} required />
           </div>
           <div className="sac-form-group">
-            <label className="sac-label">Apellido</label>
-            <input type="text" className="sac-input" value={profileDraft.apellido} onChange={(e) => setProfileDraft((current) => ({ ...current, apellido: e.target.value }))} minLength={2} maxLength={50} required />
+            <label className="sac-label" htmlFor="perfil-apellido">Apellido</label>
+            <input id="perfil-apellido" type="text" className="sac-input" value={profileDraft.apellido} onChange={(e) => setProfileDraft((current) => ({ ...current, apellido: e.target.value }))} minLength={2} maxLength={50} required />
           </div>
           <div className="sac-form-group">
-            <label className="sac-label">Correo electrónico</label>
-            <input type="email" className="sac-input" value={profileDraft.email} onChange={(e) => setProfileDraft((current) => ({ ...current, email: e.target.value }))} maxLength={254} required />
+            <label className="sac-label" htmlFor="perfil-email">Correo electrónico</label>
+            <input id="perfil-email" type="email" className="sac-input" value={profileDraft.email} onChange={(e) => setProfileDraft((current) => ({ ...current, email: e.target.value }))} maxLength={254} required />
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
             <button className="sac-primary-btn" type="submit" disabled={savingProfile}>
@@ -1699,6 +1733,64 @@ function ContactScreen({ navigateTo, user, onLogout }) {
     <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="13" user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Contacto y ayuda</h1>
       <p className="sac-page-subtitle">Enviá una consulta al equipo de atención ciudadana.</p>
+      <section aria-labelledby="contacto-redes-titulo">
+        <h2 className="sac-social-title" id="contacto-redes-titulo">También podés contactarnos por redes</h2>
+        <p className="sac-contact-social-description">
+          Abrí una red para buscar las cuentas oficiales del Municipio de Benito Juárez.
+        </p>
+        <div className="sac-social-links-row">
+          <a
+            className="sac-social-item"
+            href="https://www.facebook.com/search/top/?q=Municipio%20de%20Benito%20Ju%C3%A1rez"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="12" fill="#0866ff" />
+              <path
+                fill="#fff"
+                d="M13.45 21v-8.2h2.76l.41-3.2h-3.17V7.56c0-.93.26-1.56 1.59-1.56h1.7V3.14c-.3-.04-1.34-.14-2.55-.14-2.53 0-4.26 1.54-4.26 4.37V9.6H7.07v3.2h2.86V21h3.52Z"
+              />
+            </svg>
+            Facebook
+          </a>
+          <a
+            className="sac-social-item"
+            href="https://www.google.com/search?q=site%3Ainstagram.com+%22Municipio+de+Benito+Ju%C3%A1rez%22"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="instagram-brand-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#feda75" />
+                  <stop offset=".35" stopColor="#fa7e1e" />
+                  <stop offset=".65" stopColor="#d62976" />
+                  <stop offset="1" stopColor="#4f5bd5" />
+                </linearGradient>
+              </defs>
+              <rect x="3" y="3" width="18" height="18" rx="5" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
+              <circle cx="12" cy="12" r="4" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
+              <circle cx="17.5" cy="6.8" r="1.2" fill="#d62976" />
+            </svg>
+            Instagram
+          </a>
+          <a
+            className="sac-social-item"
+            href="https://x.com/search?q=%22Municipio%20de%20Benito%20Ju%C3%A1rez%22&src=typed_query"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon sac-social-brand-icon-x" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M18.9 2H22l-6.78 7.75L23.2 22h-6.25l-4.9-7.62L5.38 22H2.25l7.25-8.29L1.8 2h6.4l4.43 6.96L18.9 2Zm-1.1 18h1.73L7.26 3.89H5.4L17.8 20Z"
+              />
+            </svg>
+            X
+          </a>
+        </div>
+      </section>
       {error && <p className="error-message" role="alert">{error}</p>}
       {success && <p className="success-message" role="status">{success}</p>}
       <form className="sac-form-container sac-contact-form" onSubmit={handleSubmit}>
@@ -1759,8 +1851,13 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
       return;
     }
 
-    if (nueva.length < 8 || nueva.length > 72) {
-      setError("La contraseña nueva debe tener entre 8 y 72 caracteres.");
+    if (!isStrongPassword(nueva)) {
+      setError("La nueva contraseña debe cumplir todos los requisitos indicados.");
+      return;
+    }
+
+    if (nueva === actual) {
+      setError("La nueva contraseña debe ser distinta de la actual.");
       return;
     }
 
@@ -1801,6 +1898,7 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
               placeholder="Contraseña"
               value={actual}
               onChange={(e) => setActual(e.target.value)}
+              maxLength={72}
               required
             />
           </div>
@@ -1814,10 +1912,11 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
               placeholder="Contraseña"
               value={nueva}
               onChange={(e) => setNueva(e.target.value)}
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               maxLength={72}
               required
             />
+            <PasswordRequirements password={nueva} />
           </div>
 
           <div className="sac-form-group">
@@ -1829,10 +1928,13 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
               placeholder="Contraseña"
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
-              minLength={8}
+              minLength={PASSWORD_MIN_LENGTH}
               maxLength={72}
               required
             />
+            {confirmar && nueva !== confirmar && (
+              <p className="error-message" role="alert">Las contraseñas nuevas no coinciden.</p>
+            )}
           </div>
 
           {error && <p className="error-message">{error}</p>}
@@ -1846,55 +1948,6 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
     </AppLayout>
   );
 }
-
-/* Pantalla de Contacto */
-function ContactScreen({ navigateTo, user, onLogout }) {
-  return (
-    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="13" user={user} onLogout={onLogout}>
-      <h1 className="sac-page-title">Contacto</h1>
-      <p className="sac-page-subtitle">Estamos para ayudarte</p>
-
-      <div className="sac-contact-list">
-        <div className="sac-contact-card">
-          <div className="sac-contact-icon-wrapper"><Icon type="mail" size={20} /></div>
-          <div>
-            <h3>sac@municipio.gob.ar</h3>
-            <p>Envianos un correo</p>
-          </div>
-        </div>
-
-        <div className="sac-contact-card">
-          <div className="sac-contact-icon-wrapper"><span style={{ fontSize: "18px" }}>📞</span></div>
-          <div>
-            <h3>0800-123-4567</h3>
-            <p>Llamanos de lunes a viernes de 8 a 18 hs</p>
-          </div>
-        </div>
-
-        <div className="sac-contact-card">
-          <div className="sac-contact-icon-wrapper"><Icon type="pin" size={20} /></div>
-          <div>
-            <h3>Av. Principal 123</h3>
-            <p>Tu ciudad</p>
-          </div>
-        </div>
-      </div>
-
-      <h3 className="sac-social-title">Redes sociales</h3>
-      <div className="sac-social-links-row">
-        <a href="#facebook" onClick={(e) => e.preventDefault()} className="sac-social-item">
-          <span className="soc-icon fb">f</span> Facebook
-        </a>
-        <a href="#instagram" onClick={(e) => e.preventDefault()} className="sac-social-item">
-          <span className="soc-icon ig">📷</span> Instagram
-        </a>
-        <a href="#twitter" onClick={(e) => e.preventDefault()} className="sac-social-item">
-          <span className="sac-icon x">𝕏</span> X (Twitter)
-        </a>
-      </div>
-    </AppLayout>
-  );
-} 
 
 function AdminScreen({ navigateTo, user, onLogout }) {
   const [reportes, setReportes] = useState([]);
@@ -2466,9 +2519,6 @@ export default function App() {
   const [screen, setScreen] = useState(initialSession ? getLandingScreen(initialSession.user) : "login");
   const [selectedReportId, setSelectedReportId] = useState(null);
   const [user, setUser] = useState(initialSession?.user || {});
-  const [loginChallenge, setLoginChallenge] = useState("");
-  const [verificationEmail, setVerificationEmail] = useState("");
-  const [verificationCode, setVerificationCode] = useState("");
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [recoveryChallenge, setRecoveryChallenge] = useState("");
   const [recoveryCode, setRecoveryCode] = useState("");
@@ -2564,30 +2614,6 @@ export default function App() {
         })
       });
 
-      if (!response.requiere_verificacion || !response.desafio || !response.email) {
-        throw new Error("El servidor no inició la verificación por correo.");
-      }
-
-      setLoginChallenge(response.desafio);
-      setVerificationEmail(response.email);
-      setVerificationCode("");
-      setScreen("verify-email");
-    } catch (error) {
-      console.error("No se pudo iniciar sesión.", error);
-      setErrorMessage(error.message || "No se pudo iniciar sesión. Intentá nuevamente.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleVerifyCode = async () => {
-    setSubmitting(true);
-    setErrorMessage("");
-    try {
-      const response = await apiFetch("/auth/verificar-codigo", {
-        method: "POST",
-        body: JSON.stringify({ desafio: loginChallenge, codigo: verificationCode })
-      });
       if (!response.token || !response.usuario) {
         throw new Error("El servidor no devolvió los datos de inicio de sesión.");
       }
@@ -2597,12 +2623,10 @@ export default function App() {
       storage.setItem("sac_token", response.token);
       setUser(response.usuario);
       setSessionExpiresAt(Date.now() + SESSION_DURATION_MS);
-      setLoginChallenge("");
-      setVerificationCode("");
       setScreen(getLandingScreen(response.usuario));
     } catch (error) {
-      console.error("No se pudo verificar el código de inicio de sesión.", error);
-      setErrorMessage(error.message || "No se pudo verificar el código. Intentá nuevamente.");
+      console.error("No se pudo iniciar sesión.", error);
+      setErrorMessage(error.message || "No se pudo iniciar sesión. Intentá nuevamente.");
     } finally {
       setSubmitting(false);
     }
@@ -2646,8 +2670,8 @@ export default function App() {
       setErrorMessage("Ingresá el código de seis dígitos.");
       return;
     }
-    if (recoveryPassword.length < 8 || recoveryPassword.length > 72) {
-      setErrorMessage("La nueva contraseña debe tener entre 8 y 72 caracteres.");
+    if (!isStrongPassword(recoveryPassword)) {
+      setErrorMessage("La nueva contraseña debe cumplir todos los requisitos indicados.");
       return;
     }
     if (recoveryPassword !== recoveryPasswordConfirmation) {
@@ -2694,8 +2718,8 @@ export default function App() {
       setErrorMessage("Ingresá un correo válido de hasta 254 caracteres.");
       return;
     }
-    if (registerForm.contrasena.length < 8 || registerForm.contrasena.length > 72) {
-      setErrorMessage("La contraseña debe tener entre 8 y 72 caracteres.");
+    if (!isStrongPassword(registerForm.contrasena)) {
+      setErrorMessage("La contraseña debe cumplir todos los requisitos indicados.");
       return;
     }
 
@@ -2728,9 +2752,10 @@ export default function App() {
 
   const handleLogout = () => {
     clearStoredSession();
+    setUser({});
     setSessionExpiresAt(null);
-    setLoginChallenge("");
-    setVerificationCode("");
+    setLoginForm((previous) => ({ ...previous, password: "" }));
+    setErrorMessage("");
     setScreen("login");
   };
 
@@ -2801,25 +2826,6 @@ export default function App() {
         errorMessage={errorMessage}
         successMessage={successMessage}
         onSubmit={handleRegisterSubmit}
-      />
-    );
-  }
-
-  if (screen === "verify-email") {
-    return (
-      <EmailCodeVerification
-        email={verificationEmail}
-        code={verificationCode}
-        setCode={setVerificationCode}
-        onSubmit={handleVerifyCode}
-        onCancel={() => {
-          setLoginChallenge("");
-          setVerificationCode("");
-          setErrorMessage("");
-          setScreen("login");
-        }}
-        submitting={submitting}
-        errorMessage={errorMessage}
       />
     );
   }

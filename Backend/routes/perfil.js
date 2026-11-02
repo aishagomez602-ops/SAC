@@ -9,6 +9,7 @@ const crypto = require("crypto");
 const conexion = require("../db");
 const { verificarToken, verificarRol } =
     require("../middleware/auth");
+const { esContrasenaSegura } = require("../password-validation");
 
 const router = express.Router();
 const verificarUsuarioNoMunicipal = verificarRol("vecino", "administrador");
@@ -204,13 +205,11 @@ router.put(
                 typeof contrasenaActual !== "string" ||
                 typeof contrasenaNueva !== "string" ||
                 contrasenaActual.length === 0 ||
-                contrasenaNueva.length < 8 ||
-                contrasenaNueva.length > 72 ||
-                Buffer.byteLength(contrasenaNueva, "utf8") > 72
+                !esContrasenaSegura(contrasenaNueva)
             ) {
                 return res.status(400).json({
                     ok: false,
-                    mensaje: "Ingresá la contraseña actual y una nueva de 8–72 caracteres"
+                    mensaje: "Ingresá la contraseña actual y una nueva segura de 12–72 caracteres, con mayúscula, minúscula, número y símbolo"
                 });
             }
 
@@ -243,6 +242,13 @@ router.put(
                     ok: false,
                     mensaje:
                         "La contraseña actual es incorrecta"
+                });
+            }
+
+            if (contrasenaNueva === contrasenaActual) {
+                return res.status(400).json({
+                    ok: false,
+                    mensaje: "La nueva contraseña debe ser distinta de la actual"
                 });
             }
 
