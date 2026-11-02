@@ -2365,3 +2365,76 @@ button {
 .sac-secondary-btn:hover {
   background: #cbd5e1;
 }
+
+/* ==========================================================================
+   ESTILOS PANTALLA DE CONTACTO
+   ========================================================================== */
+
+.sac-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.sac-contact-card {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 18px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+
+.sac-contact-icon-wrapper {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #ffede0;
+  color: var(--orange);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.sac-contact-card h3 {
+  margin: 0 0 2px 0;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sac-contact-card p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.sac-social-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin: 24px 0 12px 0;
+  color: var(--text);
+}
+
+.sac-social-links-row {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sac-social-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sac-social-item:hover {
+  color: var(--orange-dark);
+}
