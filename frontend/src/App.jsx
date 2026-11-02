@@ -1847,6 +1847,55 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
   );
 }
 
+/* Pantalla de Contacto */
+function ContactScreen({ navigateTo, user, onLogout }) {
+  return (
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="13" user={user} onLogout={onLogout}>
+      <h1 className="sac-page-title">Contacto</h1>
+      <p className="sac-page-subtitle">Estamos para ayudarte</p>
+
+      <div className="sac-contact-list">
+        <div className="sac-contact-card">
+          <div className="sac-contact-icon-wrapper"><Icon type="mail" size={20} /></div>
+          <div>
+            <h3>sac@municipio.gob.ar</h3>
+            <p>Envianos un correo</p>
+          </div>
+        </div>
+
+        <div className="sac-contact-card">
+          <div className="sac-contact-icon-wrapper"><span style={{ fontSize: "18px" }}>📞</span></div>
+          <div>
+            <h3>0800-123-4567</h3>
+            <p>Llamanos de lunes a viernes de 8 a 18 hs</p>
+          </div>
+        </div>
+
+        <div className="sac-contact-card">
+          <div className="sac-contact-icon-wrapper"><Icon type="pin" size={20} /></div>
+          <div>
+            <h3>Av. Principal 123</h3>
+            <p>Tu ciudad</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 className="sac-social-title">Redes sociales</h3>
+      <div className="sac-social-links-row">
+        <a href="#facebook" onClick={(e) => e.preventDefault()} className="sac-social-item">
+          <span className="soc-icon fb">f</span> Facebook
+        </a>
+        <a href="#instagram" onClick={(e) => e.preventDefault()} className="sac-social-item">
+          <span className="soc-icon ig">📷</span> Instagram
+        </a>
+        <a href="#twitter" onClick={(e) => e.preventDefault()} className="sac-social-item">
+          <span className="sac-icon x">𝕏</span> X (Twitter)
+        </a>
+      </div>
+    </AppLayout>
+  );
+} 
+
 function AdminScreen({ navigateTo, user, onLogout }) {
   const [reportes, setReportes] = useState([]);
   const [usuarios, setUsuarios] = useState([]);
