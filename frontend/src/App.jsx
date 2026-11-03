@@ -155,6 +155,7 @@ const Icon = ({ type, size = 22 }) => {
     warning: <><path d="m12 3 10 18H2z" /><path d="M12 9v5m0 3v.01" /></>,
     wrench: <><path d="M14 6a5 5 0 0 0-6 6L3 17a2 2 0 0 0 3 3l5-5a5 5 0 0 0 6-6l-3 3-3-3z" /></>,
     calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></>,
+    clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
     heart: <path d="M20.8 8.8c0 5.5-8.8 11-8.8 11s-8.8-5.5-8.8-11a4.8 4.8 0 0 1 8.8-2.5 4.8 4.8 0 0 1 8.8 2.5Z" />,
     like: <><path d="M7 10v11H4V10zM7 20h9a2 2 0 0 0 2-1.6l1.5-7A2 2 0 0 0 17.5 9H13l.7-3.2A2.3 2.3 0 0 0 11.5 3L7 10" /></>,
     phone: <><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.08 4.18 2 2 0 0 1 5 2h3a2 2 0 0 1 2 1.72c.12.9.35 1.77.68 2.6.23.6.01 1.31-.53 1.78L8.7 9.29a16 16 0 0 0 6.01 6.01l1.19-1.42c.47-.54 1.18-.76 1.78-.53.83.33 1.7.56 2.6.68A2 2 0 0 1 22 16.92Z" /></>
@@ -243,8 +244,17 @@ function Logo() {
   );
 }
 
-function CityIllustration() {
-  return <p>ciudad</p>;
+function CommunityIllustration({ variant }) {
+  return (
+    <div className={`community-art community-art-${variant}`} aria-hidden="true">
+      <img
+        src={variant === "login"
+          ? "/images%20copy/imagen%20para%20el%20inicio%20de%20sesion.png"
+          : "/images%20copy/imagen%20para%20el%20registro.png"}
+        alt=""
+      />
+    </div>
+  );
 }
 
 function Field({ icon, type = "text", placeholder, name, value, onChange, autoComplete, required = false, minLength, maxLength, inputMode, pattern }) {
@@ -280,11 +290,11 @@ function Login({ goRegister, goContact, loginForm, setLoginForm, rememberMe, set
       <div className="decoration bottom-right" />
 
       <main className="layout login-layout">
-        <section className="presentation">
+        <section className="presentation login-presentation">
           <Logo />
-          <h1>Un barrio mejor<br />también depende<br /><strong>de VOS</strong></h1>
-          <p>Reportá problemas, y ayudá a un barrio<br />más ordenado y cuidado más lindo para todos.</p>
-          <CityIllustration />
+          <h1>Una comunidad mejor<br />también depende<br /><strong>de VOS</strong></h1>
+          <p>Reportá problemas y ayudá a construir una comunidad<br />más ordenada y cuidada para todos.</p>
+          <CommunityIllustration variant="login" />
         </section>
 
         <section className="card login-card">
@@ -318,7 +328,6 @@ function Login({ goRegister, goContact, loginForm, setLoginForm, rememberMe, set
         </section>
       </main>
 
-      <span className="page-number">S.A.C. - Pantalla 1</span>
     </div>
   );
 }
@@ -446,7 +455,6 @@ function ForgotPasswordScreen({
           </button>
         </section>
       </main>
-      <span className="page-number">S.A.C. - Recuperar contraseña</span>
     </div>
   );
 }
@@ -465,8 +473,8 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
       <main className="layout register-layout">
         <section className="presentation register-presentation">
           <Logo />
-          <h1 className="register-title">Juntos<br />hacemos un<br />barrio mejor</h1>
-          <CityIllustration />
+          <h1 className="register-title">Juntos<br />construimos<br />un mejor vecindario</h1>
+          <CommunityIllustration variant="register" />
         </section>
 
         <section className="card register-card">
@@ -494,7 +502,6 @@ function Register({ goLogin, registerForm, setRegisterForm, submitting, errorMes
         </section>
       </main>
 
-      <span className="page-number">S.A.C. - Pantalla 2</span>
     </div>
   );
 }
@@ -526,20 +533,16 @@ function getLandingScreen(user) {
   return "home";
 }
 
-function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogout }) {
+function AppLayout({ activeNav, navigateTo, children, user, onLogout, layoutClassName = "" }) {
   const nombreUsuario = getUserDisplayName(user);
   const isAdmin = isAdministrator(user);
   const isMunicipal = isMunicipalArea(user);
 
   return (
-    <div className="sac-app-container">
+    <div className={`sac-app-container ${layoutClassName}`.trim()}>
       <header className="sac-navbar">
         <div className="sac-logo-area">
-          <img src="/images/fabicon,fondo.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
-          <div className="sac-brand-titles">
-            <span className="sac-brand-main">S.A.C</span>
-            <span className="sac-brand-sub">Sistema de Atención Ciudadana</span>
-          </div>
+          <img src="/images/fabicon.jpeg" alt="Logo S.A.C." className="sac-nav-logo" />
         </div>
         <div className="sac-user-profile">
           <span className="sac-user-avatar">
@@ -630,7 +633,6 @@ function AppLayout({ activeNav, navigateTo, children, screenNumber, user, onLogo
         </main>
       </div>
 
-      <span className="page-number">S.A.C. - Pantalla {screenNumber}</span>
     </div>
   );
 }
@@ -640,7 +642,7 @@ function Dashboard({ navigateTo, user, onLogout }) {
   const nombre = user?.nombre || "Vecino/a";
 
   return (
-    <AppLayout activeNav="home" navigateTo={navigateTo} screenNumber="3" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="home" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <div className="sac-dashboard-header">
         <div>
           <h1 className="sac-welcome-title">¡Bienvenido/a, {nombre}!</h1>
@@ -649,7 +651,7 @@ function Dashboard({ navigateTo, user, onLogout }) {
 
         <div className="sac-city-info-card">
           <h3>Tu ciudad, más cuidada</h3>
-          <p>Participá y ayudá a mejorar tu barrio.</p>
+          <p>Participá y ayudá a mejorar tu comunidad.</p>
         </div>
       </div>
 
@@ -676,7 +678,7 @@ function Dashboard({ navigateTo, user, onLogout }) {
 
         <div className="sac-dash-card" onClick={() => navigateTo("mapa")}>
           <div className="sac-dash-card-icon orange-bg"><Icon type="pin" size={21} /></div>
-          <h3>Problemas del barrio</h3>
+          <h3>Problemas de la comunidad</h3>
           <p>Conocé los problemas más comunes</p>
         </div>
 
@@ -695,7 +697,6 @@ function ReportForm({ navigateTo, user, onLogout }) {
   const [categoria, setCategoria] = useState("");
   const [categorias, setCategorias] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-  const [titulo, setTitulo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
   const [numeroCasa, setNumeroCasa] = useState("");
@@ -798,8 +799,6 @@ function ReportForm({ navigateTo, user, onLogout }) {
     const tieneCoordenadas = Boolean(coordenadas);
     if (
       !categoria ||
-      titulo.trim().length < 5 ||
-      titulo.trim().length > 100 ||
       descripcion.trim().length < 20 ||
       descripcion.trim().length > 1000 ||
       (direccionIngresada.length > 0 && (direccionIngresada.length < 3 || direccionCompleta.length > 150)) ||
@@ -807,7 +806,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
       (alturaIngresada.length > 20 ||
         (alturaIngresada && (!direccionIngresada || !/^[\p{L}\p{N}][\p{L}\p{N}\s/-]{0,19}$/u.test(alturaIngresada))))
     ) {
-      setReportSaveError("Ingresá una dirección de al menos 3 caracteres o usá el GPS. Si agregás una altura, escribila junto a una dirección. El título admite 5–100 caracteres y la descripción 20–1000.");
+      setReportSaveError("Ingresá una descripción de 20–1000 caracteres y una dirección de al menos 3 caracteres o usá el GPS. Si agregás una altura, escribila junto a una dirección.");
       return;
     }
     setReportSaveError("");
@@ -815,7 +814,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
 
     const formData = new FormData();
     formData.append("id_categoria", categoria);
-    formData.append("titulo", titulo.trim());
+    formData.append("titulo", descripcion.trim().replace(/\s+/g, " ").slice(0, 100));
     formData.append("descripcion", descripcion.trim());
     formData.append("direccion", direccionCompleta);
     if (coordenadas) {
@@ -839,7 +838,7 @@ function ReportForm({ navigateTo, user, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="4" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Reportar un problema</h1>
       <p className="sac-page-subtitle">Completá la información para enviar tu reporte</p>
 
@@ -855,22 +854,6 @@ function ReportForm({ navigateTo, user, onLogout }) {
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="sac-form-group">
-            <label className="sac-label" htmlFor="reporte-titulo">Título</label>
-            <input
-              id="reporte-titulo"
-              className="sac-input"
-              type="text"
-              placeholder="Resumí el problema (5 a 100 caracteres)"
-              value={titulo}
-              onChange={(event) => setTitulo(event.target.value)}
-              minLength={5}
-              maxLength={100}
-              required
-            />
-            <span className="sac-char-count">{titulo.length}/100 (mínimo 5)</span>
           </div>
 
           <div className="sac-form-group">
@@ -1022,7 +1005,7 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
   };
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="5" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} user={user} onLogout={onLogout} layoutClassName="sac-reports-app">
       <h1 className="sac-page-title">{administratorView ? "Reportes" : "Mis reportes"}</h1>
       <p className="sac-page-subtitle">
         {administratorView ? "Consultá todos los reportes registrados." : "Acá podés ver el estado de todos tus reportes"}
@@ -1088,7 +1071,15 @@ function MyReports({ navigateTo, user, onLogout, setSelectedReportId }) {
                 {" • "}
                 {item.fecha_reporte ? new Date(item.fecha_reporte).toLocaleDateString("es-AR") : ""}
               </p>
-              {item.estado_revision === "pendiente" && <span className="sac-review-status pendiente">En revisión administrativa</span>}
+              {item.estado_revision === "pendiente" && (
+                <span className="sac-report-review-status">
+                  <span className="sac-report-review-icon"><Icon type="clock" size={16} /></span>
+                  <span className="sac-report-review-copy">
+                    <strong>Pendiente de revisión</strong>
+                    <small>El equipo municipal revisará tu reporte antes de publicarlo.</small>
+                  </span>
+                </span>
+              )}
               {item.estado_revision === "rechazado" && <span className="sac-review-status rechazado">No aprobado para publicación</span>}
             </div>
             <div className={`sac-status-badge ${getStatusClass(item.estado)}`}>{item.estado}</div>
@@ -1160,7 +1151,7 @@ function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
   };
 
   return (
-    <AppLayout activeNav="mapa" navigateTo={navigateTo} screenNumber="6" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="mapa" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Mapa</h1>
       <p className="sac-page-subtitle">Buscá una dirección o localidad y explorala directamente en Google Maps.</p>
 
@@ -1208,7 +1199,7 @@ function MapScreen({ navigateTo, user, onLogout, onOpenReport }) {
       <section className="sac-map-reports-section" aria-labelledby="map-reports-title">
         <div className="sac-map-reports-header">
           <div>
-            <h2 id="map-reports-title">Reportes del barrio</h2>
+            <h2 id="map-reports-title">Reportes de la comunidad</h2>
             <p>Seleccioná un reporte para ubicar su dirección en el mapa.</p>
           </div>
           <span className="sac-map-reports-count">{loadingReports ? "Cargando..." : `${reports.length} reportes`}</span>
@@ -1319,7 +1310,7 @@ function ReportDetail({ navigateTo, user, onLogout, reportId }) {
   };
 
   return (
-    <AppLayout activeNav="reportes" navigateTo={navigateTo} screenNumber="7" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="reportes" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Detalle del reporte</h1>
       <p className="sac-page-subtitle">Información y seguimiento</p>
 
@@ -1364,6 +1355,12 @@ function NotificationsScreen({ navigateTo, user, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState(false);
+  const [browserPermission, setBrowserPermission] = useState(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return "unsupported";
+    if (!window.isSecureContext) return "insecure";
+    return Notification.permission;
+  });
+  const [permissionError, setPermissionError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -1398,37 +1395,84 @@ function NotificationsScreen({ navigateTo, user, onLogout }) {
     }
   };
 
+  const handleRequestNotificationPermission = async () => {
+    setPermissionError("");
+    try {
+      const permission = await Notification.requestPermission();
+      setBrowserPermission(permission);
+    } catch (requestError) {
+      console.error("No se pudo solicitar el permiso de notificaciones.", requestError);
+      setPermissionError("No se pudo solicitar el permiso. Revisá la configuración del navegador e intentá nuevamente.");
+    }
+  };
+
   const hasUnread = notifications.some((item) => !item.leida);
 
   return (
-    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} screenNumber="8" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="notificaciones" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Notificaciones</h1>
       <p className="sac-page-subtitle">Enterate de todas las novedades</p>
 
-      {hasUnread && (
-        <button className="sac-secondary-btn" type="button" onClick={handleMarkAsRead} disabled={updating}>
-          {updating ? "Actualizando..." : "Marcar todas como leídas"}
-        </button>
-      )}
+      <section className="sac-notifications-permission" aria-label="Permiso de notificaciones del navegador">
+        <div>
+          <h2>Avisos del navegador</h2>
+          {browserPermission === "granted" && <p>El permiso está activado en este navegador.</p>}
+          {browserPermission === "default" && <p>Permití los avisos para que el navegador pueda mostrarlos.</p>}
+          {browserPermission === "denied" && <p>El permiso está bloqueado. Habilitalo desde la configuración del sitio en tu navegador.</p>}
+          {browserPermission === "unsupported" && <p>Este navegador no permite mostrar avisos del sistema.</p>}
+          {browserPermission === "insecure" && <p>Los avisos requieren una conexión segura (HTTPS) o abrir la app en localhost.</p>}
+          {permissionError && <p className="sac-notifications-permission-error" role="alert">{permissionError}</p>}
+        </div>
+        {browserPermission === "default" && (
+          <button
+            className="sac-notifications-mark-read"
+            type="button"
+            onClick={handleRequestNotificationPermission}
+          >
+            Activar avisos
+          </button>
+        )}
+      </section>
+
       {error && <p className="error-message" role="alert">{error}</p>}
+      {!loading && !error && (
+        <div className="sac-notifications-toolbar">
+          <p>
+            {notifications.length} {notifications.length === 1 ? "notificación" : "notificaciones"}
+          </p>
+          {hasUnread && (
+            <button
+              className="sac-notifications-mark-read"
+              type="button"
+              onClick={handleMarkAsRead}
+              disabled={updating}
+            >
+              {updating ? "Actualizando..." : "Marcar todas como leídas"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="sac-notifications-list">
         {loading && <p className="sac-admin-empty">Cargando notificaciones...</p>}
         {!loading && !error && notifications.length === 0 && (
-          <p className="sac-admin-empty">Todavía no tenés notificaciones.</p>
+          <p className="sac-admin-empty sac-notifications-empty">Todavía no tenés notificaciones.</p>
         )}
         {notifications.map((item) => {
           const date = item.fecha_notificacion ? new Date(item.fecha_notificacion) : null;
           return (
             <div className={`sac-notification-card ${item.leida ? "" : "unread"}`} key={item.id_notificacion}>
-              <div className="sac-notification-icon-wrapper" style={{ backgroundColor: "#f97316" }}>
+              <div className="sac-notification-icon-wrapper">
                 <Icon type={item.tipo === "estado" ? "clipboard" : "bell"} size={20} />
               </div>
               <div className="sac-notification-content">
-                <h3>{item.tipo === "estado" ? "Actualización de tu reporte" : "Notificación"}</h3>
+                <div className="sac-notification-heading">
+                  <h3>{item.tipo === "estado" ? "Actualización de tu reporte" : "Notificación"}</h3>
+                  {!item.leida && <span className="sac-notification-new">Nueva</span>}
+                </div>
                 <p>{item.mensaje}</p>
-              </div>
-              <div className="sac-notification-time">
-                {date && !Number.isNaN(date.getTime()) ? date.toLocaleString("es-AR") : ""}
+                <time className="sac-notification-time" dateTime={date && !Number.isNaN(date.getTime()) ? date.toISOString() : undefined}>
+                  {date && !Number.isNaN(date.getTime()) ? date.toLocaleString("es-AR") : ""}
+                </time>
               </div>
             </div>
           );
@@ -1449,11 +1493,11 @@ function GuiaUsoScreen({ navigateTo, user, onLogout }) {
   ];
 
   return (
-    <AppLayout activeNav="guia" navigateTo={navigateTo} screenNumber="9" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="guia" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <div className="sac-guide-page-heading">
         <span className="sac-guide-eyebrow">CENTRO DE AYUDA</span>
         <h1 className="sac-page-title">Guía de uso</h1>
-        <p className="sac-page-subtitle">Una guía simple para reportar y hacer seguimiento de los problemas del barrio.</p>
+        <p className="sac-page-subtitle">Una guía simple para reportar y hacer seguimiento de problemas en la vía pública.</p>
       </div>
 
       <div className="sac-guide-hero">
@@ -1462,7 +1506,7 @@ function GuiaUsoScreen({ navigateTo, user, onLogout }) {
           <div>
             <span className="sac-guide-hero-label">S.A.C. · Sistema de Atención Ciudadana</span>
           <h2>¿Cómo funciona el S.A.C.?</h2>
-          <p>Esta plataforma te permite reportar incidencias del barrio de forma simple, ordenada y visible para la comunidad.</p>
+          <p>Esta plataforma te permite reportar incidencias en la vía pública de forma simple, ordenada y visible para la comunidad.</p>
           </div>
         </div>
         <div className="sac-guide-hero-aside">
@@ -1493,16 +1537,6 @@ function GuiaUsoScreen({ navigateTo, user, onLogout }) {
         ))}
       </div>
 
-      <div className="sac-guide-footer-card">
-        <span className="sac-guide-footer-icon"><Icon type="megaphone" size={22} /></span>
-        <div className="sac-guide-footer-copy">
-          <h3>¿Necesitás reportar un problema ahora?</h3>
-          <p>Sumá tu aporte y ayudá a construir un vecindario mejor.</p>
-        </div>
-        <button className="sac-primary-btn sac-guide-cta-btn" onClick={() => navigateTo("reportar-form")} type="button">
-          Crear reporte ahora
-        </button>
-      </div>
     </AppLayout>
   );
 }
@@ -1603,7 +1637,7 @@ function ProfileScreen({ navigateTo, user, setUser, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="11" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Perfil</h1>
       <p className="sac-page-subtitle">Administrá tu información y preferencias</p>
 
@@ -1730,67 +1764,9 @@ function ContactScreen({ navigateTo, user, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="13" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Contacto y ayuda</h1>
       <p className="sac-page-subtitle">Enviá una consulta al equipo de atención ciudadana.</p>
-      <section aria-labelledby="contacto-redes-titulo">
-        <h2 className="sac-social-title" id="contacto-redes-titulo">También podés contactarnos por redes</h2>
-        <p className="sac-contact-social-description">
-          Abrí una red para buscar las cuentas oficiales del Municipio de Benito Juárez.
-        </p>
-        <div className="sac-social-links-row">
-          <a
-            className="sac-social-item"
-            href="https://www.facebook.com/search/top/?q=Municipio%20de%20Benito%20Ju%C3%A1rez"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="12" cy="12" r="12" fill="#0866ff" />
-              <path
-                fill="#fff"
-                d="M13.45 21v-8.2h2.76l.41-3.2h-3.17V7.56c0-.93.26-1.56 1.59-1.56h1.7V3.14c-.3-.04-1.34-.14-2.55-.14-2.53 0-4.26 1.54-4.26 4.37V9.6H7.07v3.2h2.86V21h3.52Z"
-              />
-            </svg>
-            Facebook
-          </a>
-          <a
-            className="sac-social-item"
-            href="https://www.google.com/search?q=site%3Ainstagram.com+%22Municipio+de+Benito+Ju%C3%A1rez%22"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <defs>
-                <linearGradient id="instagram-brand-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
-                  <stop stopColor="#feda75" />
-                  <stop offset=".35" stopColor="#fa7e1e" />
-                  <stop offset=".65" stopColor="#d62976" />
-                  <stop offset="1" stopColor="#4f5bd5" />
-                </linearGradient>
-              </defs>
-              <rect x="3" y="3" width="18" height="18" rx="5" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
-              <circle cx="12" cy="12" r="4" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
-              <circle cx="17.5" cy="6.8" r="1.2" fill="#d62976" />
-            </svg>
-            Instagram
-          </a>
-          <a
-            className="sac-social-item"
-            href="https://x.com/search?q=%22Municipio%20de%20Benito%20Ju%C3%A1rez%22&src=typed_query"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg className="sac-social-brand-icon sac-social-brand-icon-x" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                fill="currentColor"
-                d="M18.9 2H22l-6.78 7.75L23.2 22h-6.25l-4.9-7.62L5.38 22H2.25l7.25-8.29L1.8 2h6.4l4.43 6.96L18.9 2Zm-1.1 18h1.73L7.26 3.89H5.4L17.8 20Z"
-              />
-            </svg>
-            X
-          </a>
-        </div>
-      </section>
       {error && <p className="error-message" role="alert">{error}</p>}
       {success && <p className="success-message" role="status">{success}</p>}
       <form className="sac-form-container sac-contact-form" onSubmit={handleSubmit}>
@@ -1828,6 +1804,91 @@ function ContactScreen({ navigateTo, user, onLogout }) {
           Volver al perfil
         </button>
       </form>
+      <a
+        className="sac-contact-card sac-contact-info-link"
+        href="https://www.bing.com/maps/default.aspx?v=2&pc=FACEBK&mid=8100&where1=-37.675193%2C%20-59.804592&FORM=FBKPL1&name=Av.%20Mitre%20N%C2%B042%2C%20Benito%20Ju%C3%A1rez%2C%20Argentina%2C%207020"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        <span className="sac-contact-icon-wrapper"><Icon type="pin" size={21} /></span>
+        <span>
+          <strong>Dirección del Municipio</strong>
+          <span>Av. Mitre N° 42, Benito Juárez, Argentina, 7020 · Ver en el mapa</span>
+        </span>
+      </a>
+      <a className="sac-contact-card sac-contact-info-link" href="tel:+542292451400">
+        <span className="sac-contact-icon-wrapper"><Icon type="phone" size={20} /></span>
+        <span>
+          <strong>Teléfono del Municipio</strong>
+          <span>02292 45-1400 · Llamar</span>
+        </span>
+      </a>
+      <section className="sac-contact-social" aria-labelledby="contacto-redes-titulo">
+        <h2 className="sac-social-title" id="contacto-redes-titulo">Contactanos</h2>
+        <p className="sac-contact-social-description">
+          Escribinos por correo, seguinos en redes o visitá el sitio oficial del Municipio.
+        </p>
+        <div className="sac-social-links-row">
+          <a
+            className="sac-social-item"
+            href="mailto:municipalidadbenitojuarez@gmail.com"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="5" width="18" height="14" rx="2" stroke="#c2410c" strokeWidth="1.8" />
+              <path d="m4 7 8 6 8-6" stroke="#c2410c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Correo electrónico
+          </a>
+          <a
+            className="sac-social-item"
+            href="https://www.facebook.com/profile.php?id=100064402131639"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="12" fill="#0866ff" />
+              <path
+                fill="#fff"
+                d="M13.45 21v-8.2h2.76l.41-3.2h-3.17V7.56c0-.93.26-1.56 1.59-1.56h1.7V3.14c-.3-.04-1.34-.14-2.55-.14-2.53 0-4.26 1.54-4.26 4.37V9.6H7.07v3.2h2.86V21h3.52Z"
+              />
+            </svg>
+            Facebook
+          </a>
+          <a
+            className="sac-social-item"
+            href="https://www.instagram.com/municipiobenitojuarez/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="instagram-brand-gradient" x1="3" y1="21" x2="21" y2="3" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#feda75" />
+                  <stop offset=".35" stopColor="#fa7e1e" />
+                  <stop offset=".65" stopColor="#d62976" />
+                  <stop offset="1" stopColor="#4f5bd5" />
+                </linearGradient>
+              </defs>
+              <rect x="3" y="3" width="18" height="18" rx="5" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
+              <circle cx="12" cy="12" r="4" stroke="url(#instagram-brand-gradient)" strokeWidth="2" />
+              <circle cx="17.5" cy="6.8" r="1.2" fill="#d62976" />
+            </svg>
+            Instagram
+          </a>
+          <a
+            className="sac-social-item"
+            href="https://benitojuarez.gov.ar/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <svg className="sac-social-brand-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" stroke="#c2410c" strokeWidth="1.8" />
+              <path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" stroke="#c2410c" strokeWidth="1.5" />
+            </svg>
+            Sitio oficial
+          </a>
+        </div>
+      </section>
     </AppLayout>
   );
 }
@@ -1883,12 +1944,12 @@ function ChangePasswordScreen({ navigateTo, user, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="perfil" navigateTo={navigateTo} screenNumber="12" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="perfil" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <h1 className="sac-page-title">Cambiar contraseña</h1>
       <p className="sac-page-subtitle">Por tu seguridad, te recomendamos usar una contraseña fuerte.</p>
 
       <div className="sac-detail-card">
-        <form onSubmit={handleSubmit}>
+        <form className="sac-password-form" onSubmit={handleSubmit}>
           <div className="sac-form-group">
             <label className="sac-label" htmlFor="password-actual">Contraseña actual</label>
             <input
@@ -2150,7 +2211,7 @@ function AdminScreen({ navigateTo, user, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="admin" navigateTo={navigateTo} screenNumber="10" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="admin" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <div className="sac-admin-section">
         <div className="sac-admin-header">
           <div>
@@ -2435,7 +2496,7 @@ function MunicipalScreen({ navigateTo, user, onLogout }) {
   };
 
   return (
-    <AppLayout activeNav="municipal" navigateTo={navigateTo} screenNumber="14" user={user} onLogout={onLogout}>
+    <AppLayout activeNav="municipal" navigateTo={navigateTo} user={user} onLogout={onLogout}>
       <div className="sac-admin-section">
         <div className="sac-admin-header">
           <div>
